@@ -106,13 +106,64 @@
   text-transform: uppercase;
 }
 
+/* Scroll-Driven Narrative Entry & Exit Animations (CSS View Timeline + Reduced Motion Compliance) */
+@media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    @keyframes narrative-text-reveal {
+      entry 0% {
+        opacity: 0;
+        transform: translate3d(0, 36px, 0);
+      }
+      entry 100%,
+      exit 0% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+      }
+      exit 100% {
+        opacity: 0.15;
+        transform: translate3d(0, -28px, 0);
+      }
+    }
+
+    @keyframes narrative-stage-reveal {
+      entry 0% {
+        opacity: 0;
+        scale: 0.9;
+      }
+      entry 100%,
+      exit 0% {
+        opacity: 1;
+        scale: 1;
+      }
+      exit 100% {
+        opacity: 0.2;
+        scale: 0.94;
+      }
+    }
+
+    .narrative-screen-content {
+      animation: narrative-text-reveal auto linear both;
+      animation-timeline: view();
+    }
+
+    .narrative-stage-3d {
+      animation: narrative-stage-reveal auto linear both;
+      animation-timeline: view();
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  .narrative-screen-content,
+  .narrative-stage-3d {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    translate: 0 0 !important;
+    scale: 1 !important;
   }
 }
