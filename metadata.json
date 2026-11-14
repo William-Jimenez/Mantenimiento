@@ -1,0 +1,6 @@
+{
+  "name": "Plataforma de Solicitudes de Mantenimiento",
+  "description": "Aplicación web para registrar, asignar, dar seguimiento y analizar con IA las solicitudes de mantenimiento de equipos, instalaciones, maquinaria y herramientas de una empresa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
