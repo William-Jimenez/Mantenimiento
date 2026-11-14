@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Pause, Play } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 import { SceneVariant, ServiceScene3D } from './ServiceScene3D';
 
 export interface NarrativeStep {
@@ -169,88 +169,12 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
     return () => observer.disconnect();
   }, []);
 
-  const scrollToStep = (index: number) => {
-    const target = sectionRefs.current[index];
-    if (!target) return;
-    const prefersReduced = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
-    target.scrollIntoView({
-      behavior: prefersReduced ? 'auto' : 'smooth',
-      block: 'start',
-    });
-  };
-
   return (
     <section
       id="servicio-narrativa"
       aria-label="Explicación interactiva del servicio de mantenimiento"
       className="relative bg-void text-bone-white border-t border-white/12"
     >
-      {/* Sticky header bar for narrative section navigation + WCAG 2.2.2 motion pause control */}
-      <div className="sticky top-0 z-30 bg-void/85 backdrop-blur-md border-b border-white/10 px-[18px] sm:px-[30px] py-[14px]">
-        <div className="max-w-[1280px] w-full mx-auto flex flex-wrap items-center justify-between gap-[12px]">
-          <div className="flex items-center gap-[16px]">
-            <span className="nav-label text-saffron-spark">
-              Recorrido del servicio
-            </span>
-            <div
-              role="navigation"
-              aria-label="Pantallas del recorrido del servicio"
-              className="hidden sm:flex items-center gap-[8px]"
-            >
-              {SERVICE_NARRATIVE_STEPS.map((step, idx) => {
-                const isCurrent = activeIndex === idx;
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    onClick={() => scrollToStep(idx)}
-                    aria-current={isCurrent ? 'step' : undefined}
-                    className={`px-[12px] py-[4px] rounded-full text-[12px] tabular-nums transition-colors cursor-pointer ${
-                      isCurrent
-                        ? 'bg-bone-white text-void font-medium'
-                        : 'text-ash-gray hover:text-bone-white border border-white/12'
-                    }`}
-                  >
-                    {step.number} · {step.eyebrow}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-[12px]">
-            <button
-              type="button"
-              onClick={() => setIsPaused((prev) => !prev)}
-              className="inline-flex items-center gap-[8px] px-[12px] py-[6px] rounded-full border border-white/16 text-[12px] text-silver-mist hover:text-bone-white hover:border-white/35 transition-colors cursor-pointer"
-            >
-              {isPaused ? (
-                <>
-                  <Play className="w-[13px] h-[13px] text-saffron-spark" aria-hidden="true" />
-                  <span>Reanudar animación 3D</span>
-                </>
-              ) : (
-                <>
-                  <Pause className="w-[13px] h-[13px] text-electric-iris" aria-hidden="true" />
-                  <span>Pausar animación 3D</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={onBackToLogin}
-              className="inline-flex items-center gap-[6px] px-[14px] py-[6px] rounded-full bg-white/10 hover:bg-white/18 text-[12px] font-medium text-bone-white transition-colors cursor-pointer"
-            >
-              <ArrowUp className="w-[13px] h-[13px]" aria-hidden="true" />
-              <span>Ir al login</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Consecutive full-viewport narrative screens with identical visual distribution */}
       <div className="divide-y divide-white/8">
         {SERVICE_NARRATIVE_STEPS.map((step, index) => {
@@ -265,7 +189,7 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
               ref={(el) => {
                 sectionRefs.current[index] = el;
               }}
-              className="narrative-screen min-h-[calc(100vh-58px)] flex items-center px-[18px] sm:px-[30px] py-[60px] lg:py-[96px]"
+              className="narrative-screen min-h-screen flex items-center px-[18px] sm:px-[30px] py-[60px] lg:py-[96px]"
             >
               <div className="max-w-[1280px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-[36px] lg:gap-[48px] items-center">
                 {/* Left side: Uniform typography & narrative explanation */}
