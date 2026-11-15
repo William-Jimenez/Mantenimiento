@@ -229,8 +229,8 @@ export function LoginScreen() {
               </details>
             </div>
 
-            {/* Right column: Signature triangular particle constellation */}
-            <div className="hidden lg:block lg:col-span-6 h-[460px] relative">
+            {/* Right column: Dispersed 3D maintenance & geometric field */}
+            <div className="hidden lg:block lg:col-span-6 h-[520px] xl:h-[560px] relative">
               <ConstellationCanvas mode="constellation" className="w-full h-full" />
             </div>
           </div>

@@ -49,10 +49,10 @@ export function LogoLockup({ onClick }: { onClick?: () => void }) {
 }
 
 /**
- * Node kinds in the constellation mesh:
- * - 'triangle': Original signature Dala triangle (majority of the mesh, ~62%)
- * - 'tool-*': Maintenance tools (~20% of the mesh: wrench, screwdriver, gear, spanner-nut)
- * - 'geo-*': Distinct 3D geometric shapes (~18% of the mesh: octahedron, cube, hex-prism, orbital-ring)
+ * Node kinds in the 3D field:
+ * - 'triangle': Original signature Dala triangle (majority of the field)
+ * - 'tool-*': Maintenance tools (wrench, screwdriver, gear, hex-nut)
+ * - 'geo-*': Distinct 3D geometric shapes (octahedron, cube, hex-prism, orbital-ring)
  */
 export type ConstellationNodeKind =
   | 'triangle'
@@ -69,8 +69,10 @@ interface Particle {
   index: number;
   x: number;
   y: number;
+  z: number;
   baseX: number;
   baseY: number;
+  baseZ: number;
   size: number;
   angle: number;
   spin: number;
@@ -78,35 +80,33 @@ interface Particle {
   tiltY: number;
   spinX: number;
   spinY: number;
+  freqX: number;
+  freqY: number;
+  ampX: number;
+  ampY: number;
+  phaseX: number;
+  phaseY: number;
   color: string;
   alpha: number;
-  phase: number;
   kind: ConstellationNodeKind;
-  hasSupportRing: boolean;
   // Smooth localized zoom state
   currentScale: number;
   currentPushX: number;
   currentPushY: number;
   currentAlpha: number;
   zoomInfluence: number;
-  // Three.js scene object reference (when WebGL is active)
+  // Three.js scene object references
   object3D?: THREE.Group;
-  materials?: THREE.Material[];
-}
-
-interface SupportLink {
-  fromIndex: number;
-  toIndex: number;
-  line3D?: THREE.Line;
   lineMat?: THREE.LineBasicMaterial;
+  fillMat?: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
 }
 
 const PALETTE = ['#8052ff', '#ffb829', '#15846e', '#ffffff'];
 
 /** Radius in CSS pixels for the localized cursor zoom effect */
-const LOCAL_ZOOM_RADIUS_PX = 115;
-/** Maximum scale amplification at the exact center of the cursor lens */
-const MAX_LOCAL_ZOOM_SCALE = 2.6;
+const LOCAL_ZOOM_RADIUS_PX = 110;
+/** Maximum scale amplification at the center of the cursor zoom zone */
+const MAX_LOCAL_ZOOM_SCALE = 2.35;
 
 function isWebGLAvailable(): boolean {
   if (typeof window === 'undefined') return false;
@@ -122,8 +122,17 @@ function isWebGLAvailable(): boolean {
 }
 
 /**
- * Deterministic selection of node kind so the constellation preserves ~62% original triangles,
- * ~20% recognizable maintenance tools, and ~18% distinct 3D geometric shapes.
+ * Deterministic pseudo-random generator in [0, 1) seeded by integer index & salt
+ * so every element gets an unaligned position, scale, and motion vector.
+ */
+function seededRandom(index: number, salt: number): number {
+  const x = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453123;
+  return x - Math.floor(x);
+}
+
+/**
+ * Deterministic selection of node kind:
+ * ~62% original triangles, ~20% maintenance tools, ~18% 3D geometric shapes.
  */
 function pickNodeKind(
   index: number,
@@ -132,7 +141,6 @@ function pickNodeKind(
   if (mode === 'ambient') {
     return index % 7 === 0 ? 'geo-octahedron' : 'triangle';
   }
-  // Deterministic hash in [0..99]
   const h = (index * 37 + 13) % 100;
   if (h < 62) {
     return 'triangle';
@@ -157,8 +165,7 @@ function pickNodeKind(
 
 /**
  * Builds normalized (unit radius = 1) line segment vertices [x1,y1,z1, x2,y2,z2, ...]
- * for each node kind so Three.js LineSegments can render crisp wireframe tools,
- * 3D polyhedra, and triangles.
+ * with clean, refined geometry for each node kind.
  */
 function buildUnitSegmentsForKind(kind: ConstellationNodeKind): number[] {
   const segs: number[] = [];
@@ -183,106 +190,108 @@ function buildUnitSegmentsForKind(kind: ConstellationNodeKind): number[] {
   if (kind === 'triangle') {
     addLoop([
       [0, 1.0, 0],
-      [0.86, -0.5, 0],
-      [-0.86, -0.5, 0],
+      [0.866, -0.5, 0],
+      [-0.866, -0.5, 0],
     ]);
     return segs;
   }
 
   if (kind === 'tool-wrench') {
-    // Recognizable double-ended open wrench silhouette + inner grip slot
+    // Sleek double-ended open wrench with 3D thickness
+    const zFront = 0.08;
     const wrenchOutline: Array<[number, number, number]> = [
-      [-0.22, 0.55, 0],
-      [-0.58, 0.82, 0],
-      [-0.62, 1.28, 0],
-      [-0.28, 1.52, 0],
-      [-0.28, 1.05, 0],
-      [0.28, 1.05, 0],
-      [0.28, 1.52, 0],
-      [0.62, 1.28, 0],
-      [0.58, 0.82, 0],
-      [0.22, 0.55, 0],
-      [0.22, -0.55, 0],
-      [0.54, -0.82, 0],
-      [0.58, -1.24, 0],
-      [0.24, -1.46, 0],
-      [0.24, -1.02, 0],
-      [-0.24, -1.02, 0],
-      [-0.24, -1.46, 0],
-      [-0.58, -1.24, 0],
-      [-0.54, -0.82, 0],
-      [-0.22, -0.55, 0],
+      [-0.18, 0.52, zFront],
+      [-0.5, 0.78, zFront],
+      [-0.54, 1.2, zFront],
+      [-0.24, 1.42, zFront],
+      [-0.24, 0.98, zFront],
+      [0.24, 0.98, zFront],
+      [0.24, 1.42, zFront],
+      [0.54, 1.2, zFront],
+      [0.5, 0.78, zFront],
+      [0.18, 0.52, zFront],
+      [0.18, -0.52, zFront],
+      [0.46, -0.78, zFront],
+      [0.5, -1.16, zFront],
+      [0.22, -1.36, zFront],
+      [0.22, -0.94, zFront],
+      [-0.22, -0.94, zFront],
+      [-0.22, -1.36, zFront],
+      [-0.5, -1.16, zFront],
+      [-0.46, -0.78, zFront],
+      [-0.18, -0.52, zFront],
     ];
     addLoop(wrenchOutline);
-    // Calibration slot inside the handle
-    addLine(0, 0.38, 0.05, 0, -0.38, 0.05);
+    // Subtle center grip slot
+    addLoop([
+      [-0.06, 0.36, zFront],
+      [0.06, 0.36, zFront],
+      [0.06, -0.36, zFront],
+      [-0.06, -0.36, zFront],
+    ]);
     return segs;
   }
 
   if (kind === 'tool-screwdriver') {
-    // Ergonomic handle + bolster collar + shaft + flathead tip
+    // Precision technical screwdriver
     addLoop([
-      [-0.38, -1.45, 0],
-      [0.38, -1.45, 0],
-      [0.46, -0.52, 0],
-      [-0.46, -0.52, 0],
+      [-0.32, -1.35, 0],
+      [0.32, -1.35, 0],
+      [0.38, -0.48, 0],
+      [-0.38, -0.48, 0],
     ]);
-    // Handle grip ribs
-    addLine(-0.2, -1.32, 0.04, -0.2, -0.62, 0.04);
-    addLine(0.2, -1.32, 0.04, 0.2, -0.62, 0.04);
+    addLine(-0.14, -1.2, 0.03, -0.14, -0.6, 0.03);
+    addLine(0.14, -1.2, 0.03, 0.14, -0.6, 0.03);
     // Bolster collar
     addLoop([
-      [-0.54, -0.52, 0],
-      [0.54, -0.52, 0],
-      [0.54, -0.34, 0],
-      [-0.54, -0.34, 0],
+      [-0.44, -0.48, 0],
+      [0.44, -0.48, 0],
+      [0.44, -0.32, 0],
+      [-0.44, -0.32, 0],
     ]);
-    // Steel shaft
-    addLine(-0.12, -0.34, 0, -0.12, 0.95, 0);
-    addLine(0.12, -0.34, 0, 0.12, 0.95, 0);
-    // Precision flathead wedge tip
+    // Shaft & flathead tip
+    addLine(-0.09, -0.32, 0, -0.09, 0.92, 0);
+    addLine(0.09, -0.32, 0, 0.09, 0.92, 0);
     addLoop([
-      [-0.12, 0.95, 0],
-      [0.12, 0.95, 0],
-      [0.28, 1.48, 0],
-      [-0.28, 1.48, 0],
+      [-0.09, 0.92, 0],
+      [0.09, 0.92, 0],
+      [0.22, 1.38, 0],
+      [-0.22, 1.38, 0],
     ]);
     return segs;
   }
 
   if (kind === 'tool-gear') {
-    // 8-tooth mechanical maintenance gear + inner hub + cross spokes
+    // Clean 8-tooth precision gear with smooth circular bore (no messy X cross)
     const teeth = 8;
     const steps = teeth * 4;
     const outerPts: Array<[number, number, number]> = [];
     for (let i = 0; i < steps; i++) {
       const a = (i / steps) * Math.PI * 2;
       const mod = i % 4;
-      const r = mod === 0 || mod === 1 ? 1.32 : 0.94;
+      const r = mod === 0 || mod === 1 ? 1.22 : 0.92;
       outerPts.push([Math.cos(a) * r, Math.sin(a) * r, 0]);
     }
     addLoop(outerPts);
 
     const hubPts: Array<[number, number, number]> = [];
-    const hubSides = 12;
+    const hubSides = 16;
     for (let i = 0; i < hubSides; i++) {
       const a = (i / hubSides) * Math.PI * 2;
-      hubPts.push([Math.cos(a) * 0.44, Math.sin(a) * 0.44, 0.06]);
+      hubPts.push([Math.cos(a) * 0.45, Math.sin(a) * 0.45, 0.04]);
     }
     addLoop(hubPts);
-    addLine(-0.44, 0, 0.06, 0.44, 0, 0.06);
-    addLine(0, -0.44, 0.06, 0, 0.44, 0.06);
     return segs;
   }
 
   if (kind === 'tool-nut') {
-    // Precision hex nut + threaded inner bore + 3D depth ring
+    // Clean 3D hexagonal nut with circular inner thread
     const hexOuter: Array<[number, number, number]> = [];
     const hexBack: Array<[number, number, number]> = [];
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;
-      hexOuter.push([Math.cos(a) * 1.25, Math.sin(a) * 1.25, 0.18]);
-      hexBack.push([Math.cos(a) * 1.25, Math.sin(a) * 1.25, -0.18]);
+      hexOuter.push([Math.cos(a) * 1.15, Math.sin(a) * 1.15, 0.15]);
+      hexBack.push([Math.cos(a) * 1.15, Math.sin(a) * 1.15, -0.15]);
       addLine(
         hexOuter[i][0],
         hexOuter[i][1],
@@ -296,23 +305,22 @@ function buildUnitSegmentsForKind(kind: ConstellationNodeKind): number[] {
     addLoop(hexBack);
 
     const borePts: Array<[number, number, number]> = [];
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      borePts.push([Math.cos(a) * 0.56, Math.sin(a) * 0.56, 0.18]);
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      borePts.push([Math.cos(a) * 0.52, Math.sin(a) * 0.52, 0.15]);
     }
     addLoop(borePts);
     return segs;
   }
 
   if (kind === 'geo-octahedron') {
-    // True 3D octahedron diamond
     const v: Array<[number, number, number]> = [
-      [0, 1.32, 0],
-      [0, -1.32, 0],
-      [-1.12, 0, 0],
-      [1.12, 0, 0],
-      [0, 0, -1.12],
-      [0, 0, 1.12],
+      [0, 1.22, 0],
+      [0, -1.22, 0],
+      [-1.02, 0, 0],
+      [1.02, 0, 0],
+      [0, 0, -1.02],
+      [0, 0, 1.02],
     ];
     const edges = [
       [0, 2],
@@ -335,8 +343,7 @@ function buildUnitSegmentsForKind(kind: ConstellationNodeKind): number[] {
   }
 
   if (kind === 'geo-cube') {
-    // True 3D isometric wireframe cube
-    const s = 0.88;
+    const s = 0.82;
     const v: Array<[number, number, number]> = [
       [-s, -s, -s],
       [s, -s, -s],
@@ -368,13 +375,12 @@ function buildUnitSegmentsForKind(kind: ConstellationNodeKind): number[] {
   }
 
   if (kind === 'geo-hex-prism') {
-    // Nested hexagonal prism with radial struts
     const outer: Array<[number, number, number]> = [];
     const inner: Array<[number, number, number]> = [];
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;
-      outer.push([Math.cos(a) * 1.24, Math.sin(a) * 1.24, 0]);
-      inner.push([Math.cos(a) * 0.58, Math.sin(a) * 0.58, 0.25]);
+      outer.push([Math.cos(a) * 1.14, Math.sin(a) * 1.14, -0.12]);
+      inner.push([Math.cos(a) * 0.58, Math.sin(a) * 0.58, 0.18]);
       addLine(
         outer[i][0],
         outer[i][1],
@@ -389,30 +395,24 @@ function buildUnitSegmentsForKind(kind: ConstellationNodeKind): number[] {
     return segs;
   }
 
-  // 'geo-orbital-ring': Orthogonal 3D gyroscopic rings + center diamond
+  // 'geo-orbital-ring': Clean dual gyroscopic rings
   const ring1: Array<[number, number, number]> = [];
   const ring2: Array<[number, number, number]> = [];
-  const steps = 16;
+  const steps = 20;
   for (let i = 0; i < steps; i++) {
     const a = (i / steps) * Math.PI * 2;
-    ring1.push([Math.cos(a) * 1.22, Math.sin(a) * 1.22, 0]);
-    ring2.push([Math.cos(a) * 0.92, 0, Math.sin(a) * 0.92]);
+    ring1.push([Math.cos(a) * 1.15, Math.sin(a) * 1.15, 0]);
+    ring2.push([Math.cos(a) * 0.82, 0, Math.sin(a) * 0.82]);
   }
   addLoop(ring1);
   addLoop(ring2);
-  addLoop([
-    [0, 0.42, 0],
-    [0.42, 0, 0],
-    [0, -0.42, 0],
-    [-0.42, 0, 0],
-  ]);
   return segs;
 }
 
 /**
- * Helper to draw any node kind in the 2D Canvas fallback (or overlay).
+ * Helper to draw any node kind in the 2D Canvas fallback when WebGL is unavailable.
  */
-function drawNode2D(
+function drawNode2DFallback(
   ctx: CanvasRenderingContext2D,
   p: Particle,
   dpr: number
@@ -427,7 +427,9 @@ function drawNode2D(
   ctx.strokeStyle = p.color;
   ctx.fillStyle = p.color;
   ctx.globalAlpha = Math.min(1, p.currentAlpha);
-  ctx.lineWidth = (1.2 + p.zoomInfluence * 0.55) * dpr;
+  ctx.lineWidth = (1.15 + p.zoomInfluence * 0.45) * dpr;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
 
   const segs = buildUnitSegmentsForKind(p.kind);
   const cosX = Math.cos(p.tiltX);
@@ -450,17 +452,6 @@ function drawNode2D(
     ctx.lineTo(x2, y2);
   }
   ctx.stroke();
-
-  if (p.hasSupportRing || p.zoomInfluence > 0.15) {
-    ctx.globalAlpha = Math.min(0.65, p.currentAlpha * (0.35 + p.zoomInfluence * 0.5));
-    ctx.lineWidth = 0.85 * dpr;
-    ctx.beginPath();
-    ctx.arc(0, 0, s * 1.48, 0, Math.PI * 0.65);
-    ctx.moveTo(-s * 1.48, 0);
-    ctx.arc(0, 0, s * 1.48, Math.PI, Math.PI * 1.65);
-    ctx.stroke();
-  }
-
   ctx.restore();
 }
 
@@ -472,14 +463,12 @@ export function ConstellationCanvas({
   className?: string;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const webglCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
-    const webglCanvas = webglCanvasRef.current;
-    const overlayCanvas = overlayCanvasRef.current;
-    if (!container || !webglCanvas || !overlayCanvas) return;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return;
 
     const prefersReducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)'
@@ -489,11 +478,7 @@ export function ConstellationCanvas({
     let cssHeight = Math.max(container.clientHeight, 1);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    overlayCanvas.width = cssWidth * dpr;
-    overlayCanvas.height = cssHeight * dpr;
-    const overlayCtx = overlayCanvas.getContext('2d');
-
-    // Pointer tracking state in CSS pixels relative to container
+    // Pointer tracking state in CSS pixels relative to container (no visual ring around cursor)
     const pointer = {
       active: false,
       targetX: cssWidth * 0.5,
@@ -503,63 +488,128 @@ export function ConstellationCanvas({
       lensStrength: 0,
     };
 
+    /**
+     * Generates a dispersed, non-aligned random distribution across the entire area
+     * using relaxed minimum-distance sampling so elements float organically without
+     * forming any recognizable ring/shape and without overlapping or clipping at the edges.
+     */
     const buildParticles = (w: number, h: number): Particle[] => {
-      const count = mode === 'constellation' ? 170 : 48;
-      const cx = w * 0.5;
-      const cy = h * 0.5;
-      const radius = Math.min(w, h) * 0.36;
+      const count = mode === 'constellation' ? 112 : 44;
       const list: Particle[] = [];
 
-      for (let i = 0; i < count; i++) {
-        let bx: number;
-        let by: number;
+      // Safe padding from container edges so no shape or zoomed shape is ever cut off
+      const padX = Math.max(38, w * 0.08);
+      const padY = Math.max(38, h * 0.08);
+      const usableW = Math.max(w - padX * 2, 100);
+      const usableH = Math.max(h - padY * 2, 100);
 
-        if (mode === 'constellation' && i < count * 0.78) {
-          // Exact original organic neural / triangular cluster shape
-          const t = (i / (count * 0.78)) * Math.PI * 2;
-          const r =
-            radius * (0.32 + 0.68 * Math.pow(((i * 37) % 100) / 100, 0.55));
-          const lobe = 1 + 0.18 * Math.sin(t * 3) + 0.1 * Math.cos(t * 2);
-          bx = cx + Math.cos(t * 5.3) * r * lobe * 1.12;
-          by = cy + Math.sin(t * 5.3) * r * 0.84;
-        } else {
-          bx = (((i * 73) % 100) / 100) * w;
-          by = (((i * 41 + 19) % 100) / 100) * h;
+      // Minimum separation distance to keep tools and geometric shapes visually clean
+      const minSeparation = Math.max(
+        24,
+        Math.min(usableW, usableH) / Math.sqrt(count * 1.45)
+      );
+
+      const placedPositions: Array<{ x: number; y: number }> = [];
+
+      for (let i = 0; i < count; i++) {
+        let bestX = padX + seededRandom(i, 1) * usableW;
+        let bestY = padY + seededRandom(i, 2) * usableH;
+        let bestMinDist = -1;
+
+        // Candidate sampling to avoid overlaps while keeping distribution completely random & form-free
+        const candidates = 12;
+        for (let c = 0; c < candidates; c++) {
+          const candX = padX + seededRandom(i * 19 + c, 3 + c) * usableW;
+          const candY = padY + seededRandom(i * 19 + c, 17 + c) * usableH;
+
+          let nearest = Infinity;
+          for (const prev of placedPositions) {
+            const d = Math.hypot(candX - prev.x, candY - prev.y);
+            if (d < nearest) nearest = d;
+          }
+
+          if (nearest >= minSeparation) {
+            bestX = candX;
+            bestY = candY;
+            break;
+          }
+          if (nearest > bestMinDist) {
+            bestMinDist = nearest;
+            bestX = candX;
+            bestY = candY;
+          }
         }
 
+        placedPositions.push({ x: bestX, y: bestY });
+
         const kind = pickNodeKind(i, mode);
-        const isSpecial = kind !== 'triangle';
-        // Tools and 3D geometric nodes are slightly larger so their silhouette is recognizable at a glance
-        const baseSize =
-          mode === 'constellation'
-            ? 4 + (i % 5) * 1.6
-            : 3 + (i % 4) * 1.5;
-        const sizeMultiplier =
-          kind.startsWith('tool-') ? 1.55 : isSpecial ? 1.32 : 1.0;
+        const isTool = kind.startsWith('tool-');
+        const isGeo = kind.startsWith('geo-');
+
+        // Unaligned individual scale per element
+        const randomScale = 0.72 + seededRandom(i, 5) * 0.68;
+        const baseUnit = mode === 'constellation' ? 6.2 : 4.6;
+        const kindMultiplier = isTool ? 1.38 : isGeo ? 1.22 : 0.95;
+        const size = baseUnit * randomScale * kindMultiplier;
+
+        // Unaligned 3D depth, orientation, and subtle motion parameters
+        const baseZ = (seededRandom(i, 6) - 0.5) * 120;
+        const angle = seededRandom(i, 7) * Math.PI * 2;
+        const spinDir = seededRandom(i, 8) > 0.5 ? 1 : -1;
+        const spin = spinDir * (0.0018 + seededRandom(i, 9) * 0.0042);
+
+        const tiltX =
+          isTool || isGeo
+            ? (seededRandom(i, 10) - 0.5) * 0.85
+            : (seededRandom(i, 10) - 0.5) * 0.35;
+        const tiltY =
+          isTool || isGeo
+            ? (seededRandom(i, 11) - 0.5) * 0.85
+            : (seededRandom(i, 11) - 0.5) * 0.35;
+
+        const spinX =
+          (seededRandom(i, 12) > 0.5 ? 1 : -1) *
+          (0.002 + seededRandom(i, 13) * 0.005);
+        const spinY =
+          (seededRandom(i, 14) > 0.5 ? 1 : -1) *
+          (0.002 + seededRandom(i, 15) * 0.005);
+
+        const freqX = 0.55 + seededRandom(i, 16) * 0.9;
+        const freqY = 0.45 + seededRandom(i, 17) * 0.85;
+        const ampX = 3.5 + seededRandom(i, 18) * 6.5;
+        const ampY = 3.5 + seededRandom(i, 19) * 6.5;
+        const phaseX = seededRandom(i, 20) * Math.PI * 2;
+        const phaseY = seededRandom(i, 21) * Math.PI * 2;
 
         const baseAlpha =
           mode === 'constellation'
-            ? 0.35 + (i % 6) * 0.1
-            : 0.16 + (i % 4) * 0.05;
+            ? 0.38 + seededRandom(i, 22) * 0.48
+            : 0.18 + seededRandom(i, 22) * 0.22;
 
         list.push({
           index: i,
-          x: bx,
-          y: by,
-          baseX: bx,
-          baseY: by,
-          size: baseSize * sizeMultiplier,
-          angle: (i * 0.7) % (Math.PI * 2),
-          spin: (i % 2 === 0 ? 1 : -1) * 0.004,
-          tiltX: isSpecial ? (i * 0.45) % Math.PI : 0,
-          tiltY: isSpecial ? (i * 0.65) % Math.PI : 0,
-          spinX: isSpecial ? (i % 2 === 0 ? 1 : -1) * 0.007 : 0,
-          spinY: isSpecial ? (i % 3 === 0 ? 1 : -1) * 0.009 : 0,
+          x: bestX,
+          y: bestY,
+          z: baseZ,
+          baseX: bestX,
+          baseY: bestY,
+          baseZ,
+          size,
+          angle,
+          spin,
+          tiltX,
+          tiltY,
+          spinX,
+          spinY,
+          freqX,
+          freqY,
+          ampX,
+          ampY,
+          phaseX,
+          phaseY,
           color: PALETTE[i % PALETTE.length],
-          alpha: isSpecial ? Math.min(0.95, baseAlpha + 0.14) : baseAlpha,
-          phase: i * 0.4,
+          alpha: baseAlpha,
           kind,
-          hasSupportRing: isSpecial && i % 3 === 0,
           currentScale: 1,
           currentPushX: 0,
           currentPushY: 0,
@@ -570,52 +620,28 @@ export function ConstellationCanvas({
       return list;
     };
 
-    // Build cohesive supporting filament links between transformed nodes and their nearest neighbor
-    const buildSupportLinks = (pts: Particle[]): SupportLink[] => {
-      if (mode !== 'constellation') return [];
-      const links: SupportLink[] = [];
-      for (let i = 0; i < pts.length; i++) {
-        if (pts[i].kind === 'triangle' || i % 2 !== 0) continue;
-        let bestIdx = -1;
-        let bestDist = 78;
-        for (let j = 0; j < pts.length; j++) {
-          if (i === j) continue;
-          const d = Math.hypot(
-            pts[i].baseX - pts[j].baseX,
-            pts[i].baseY - pts[j].baseY
-          );
-          if (d > 18 && d < bestDist) {
-            bestDist = d;
-            bestIdx = j;
-          }
-        }
-        if (bestIdx !== -1) {
-          links.push({ fromIndex: i, toIndex: bestIdx });
-        }
-      }
-      return links;
-    };
-
     let particles = buildParticles(cssWidth, cssHeight);
-    let supportLinks = buildSupportLinks(particles);
 
-    // Optional Three.js WebGL setup
+    // Three.js WebGL setup (or 2D fallback if WebGL is unavailable)
     let renderer: THREE.WebGLRenderer | null = null;
     let scene: THREE.Scene | null = null;
     let camera: THREE.OrthographicCamera | null = null;
     let rootGroup: THREE.Group | null = null;
+    let cursorLight: THREE.PointLight | null = null;
+    let fallbackCtx: CanvasRenderingContext2D | null = null;
     const disposables: Array<{ dispose: () => void }> = [];
 
     if (isWebGLAvailable()) {
       try {
         renderer = new THREE.WebGLRenderer({
-          canvas: webglCanvas,
+          canvas,
           alpha: true,
           antialias: true,
           powerPreference: 'low-power',
         });
         renderer.setPixelRatio(dpr);
         renderer.setSize(cssWidth, cssHeight, false);
+        renderer.setClearColor(0x000000, 0);
 
         scene = new THREE.Scene();
         camera = new THREE.OrthographicCamera(
@@ -626,7 +652,24 @@ export function ConstellationCanvas({
           -600,
           600
         );
-        camera.position.set(0, 0, 200);
+        camera.position.set(0, 0, 240);
+
+        // Continuous, soft 3D lighting without any hard clipping plane
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        scene.add(ambientLight);
+
+        const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.35);
+        dirLight1.position.set(180, 220, 300);
+        scene.add(dirLight1);
+
+        const dirLight2 = new THREE.DirectionalLight(0x8052ff, 0.9);
+        dirLight2.position.set(-200, -160, 220);
+        scene.add(dirLight2);
+
+        cursorLight = new THREE.PointLight(0xffb829, 2.2, 260, 1.6);
+        cursorLight.position.set(0, 0, 120);
+        scene.add(cursorLight);
+
         rootGroup = new THREE.Group();
         scene.add(rootGroup);
       } catch {
@@ -634,48 +677,61 @@ export function ConstellationCanvas({
       }
     }
 
-    // Shared unit geometries per kind in Three.js
-    const geometryCache = new Map<ConstellationNodeKind, THREE.BufferGeometry>();
-    let supportArcGeo: THREE.BufferGeometry | null = null;
+    if (!renderer) {
+      canvas.width = cssWidth * dpr;
+      canvas.height = cssHeight * dpr;
+      fallbackCtx = canvas.getContext('2d');
+    }
 
-    const getGeometryForKind = (
+    // Shared wireframe and solid-core geometries per kind
+    const lineGeoCache = new Map<ConstellationNodeKind, THREE.BufferGeometry>();
+    const fillGeoCache = new Map<ConstellationNodeKind, THREE.BufferGeometry>();
+
+    const getLineGeometry = (
       kind: ConstellationNodeKind
     ): THREE.BufferGeometry => {
-      const existing = geometryCache.get(kind);
+      const existing = lineGeoCache.get(kind);
       if (existing) return existing;
       const segs = buildUnitSegmentsForKind(kind);
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(segs, 3)
-      );
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
       disposables.push(geo);
-      geometryCache.set(kind, geo);
+      lineGeoCache.set(kind, geo);
       return geo;
     };
 
-    const getSupportArcGeometry = (): THREE.BufferGeometry => {
-      if (supportArcGeo) return supportArcGeo;
-      const pts: number[] = [];
-      const arcSteps = 10;
-      for (const offsetAngle of [0, Math.PI]) {
-        for (let s = 0; s < arcSteps; s++) {
-          const a1 = offsetAngle + (s / arcSteps) * Math.PI * 0.62;
-          const a2 = offsetAngle + ((s + 1) / arcSteps) * Math.PI * 0.62;
-          pts.push(
-            Math.cos(a1) * 1.48,
-            Math.sin(a1) * 1.48,
-            0,
-            Math.cos(a2) * 1.48,
-            Math.sin(a2) * 1.48,
-            0
-          );
-        }
+    const getFillGeometry = (
+      kind: ConstellationNodeKind
+    ): THREE.BufferGeometry => {
+      const existing = fillGeoCache.get(kind);
+      if (existing) return existing;
+
+      let geo: THREE.BufferGeometry;
+      if (kind === 'triangle') {
+        geo = new THREE.BufferGeometry();
+        const verts = new Float32Array([
+          0, 1.0, 0,
+          -0.866, -0.5, 0,
+          0.866, -0.5, 0,
+        ]);
+        geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+        geo.computeVertexNormals();
+      } else if (kind === 'geo-octahedron') {
+        geo = new THREE.OctahedronGeometry(1.0, 0);
+      } else if (kind === 'geo-cube') {
+        geo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+      } else if (kind === 'geo-hex-prism' || kind === 'tool-nut') {
+        geo = new THREE.CylinderGeometry(0.95, 0.95, 0.26, 6);
+        geo.rotateX(Math.PI / 2);
+      } else if (kind === 'tool-gear' || kind === 'geo-orbital-ring') {
+        geo = new THREE.RingGeometry(0.45, 0.92, 16);
+      } else {
+        // Subtle handle/body bar for wrench and screwdriver
+        geo = new THREE.PlaneGeometry(0.32, 1.05);
       }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+
       disposables.push(geo);
-      supportArcGeo = geo;
+      fillGeoCache.set(kind, geo);
       return geo;
     };
 
@@ -685,75 +741,44 @@ export function ConstellationCanvas({
         rootGroup.remove(rootGroup.children[0]);
       }
 
-      // Create 3D support filaments
-      for (const link of supportLinks) {
-        const lineGeo = new THREE.BufferGeometry();
-        lineGeo.setAttribute(
-          'position',
-          new THREE.Float32BufferAttribute([0, 0, -4, 0, 0, -4], 3)
-        );
-        const lineMat = new THREE.LineBasicMaterial({
-          color: particles[link.fromIndex].color,
-          transparent: true,
-          opacity: 0.14,
-        });
-        disposables.push(lineGeo, lineMat);
-        const line = new THREE.Line(lineGeo, lineMat);
-        link.line3D = line;
-        link.lineMat = lineMat;
-        rootGroup.add(line);
-      }
-
-      // Create 3D node groups for every particle (triangles, maintenance tools, and 3D shapes)
       for (const p of particles) {
         const group = new THREE.Group();
-        const mats: THREE.Material[] = [];
 
-        const mainMat = new THREE.LineBasicMaterial({
+        // Crisp wireframe outline
+        const lineMat = new THREE.LineBasicMaterial({
           color: p.color,
           transparent: true,
           opacity: p.alpha,
         });
-        disposables.push(mainMat);
-        mats.push(mainMat);
+        disposables.push(lineMat);
 
-        const mainLines = new THREE.LineSegments(
-          getGeometryForKind(p.kind),
-          mainMat
+        const lineSegments = new THREE.LineSegments(
+          getLineGeometry(p.kind),
+          lineMat
         );
-        group.add(mainLines);
+        group.add(lineSegments);
 
-        // Add subtle inner core fill for maintenance tools & 3D shapes so they stand out cleanly
-        if (p.kind !== 'triangle') {
-          const coreGeo = new THREE.OctahedronGeometry(0.32, 0);
-          const coreMat = new THREE.MeshBasicMaterial({
-            color: p.color,
-            transparent: true,
-            opacity: p.alpha * 0.28,
-          });
-          disposables.push(coreGeo, coreMat);
-          mats.push(coreMat);
-          group.add(new THREE.Mesh(coreGeo, coreMat));
-        }
+        // Cohesive translucent inner shading matching each shape's true geometry
+        const fillMat = new THREE.MeshStandardMaterial({
+          color: p.color,
+          emissive: p.color,
+          emissiveIntensity: 0.25,
+          roughness: 0.35,
+          metalness: 0.6,
+          transparent: true,
+          opacity: p.alpha * 0.16,
+          side: THREE.DoubleSide,
+          flatShading: true,
+          depthWrite: false,
+        });
+        disposables.push(fillMat);
 
-        // Optional precision bracket ring around select transformed tools/shapes
-        if (p.hasSupportRing) {
-          const ringMat = new THREE.LineBasicMaterial({
-            color: p.color,
-            transparent: true,
-            opacity: p.alpha * 0.45,
-          });
-          disposables.push(ringMat);
-          mats.push(ringMat);
-          const ringLines = new THREE.LineSegments(
-            getSupportArcGeometry(),
-            ringMat
-          );
-          group.add(ringLines);
-        }
+        const fillMesh = new THREE.Mesh(getFillGeometry(p.kind), fillMat);
+        group.add(fillMesh);
 
         p.object3D = group;
-        p.materials = mats;
+        p.lineMat = lineMat;
+        p.fillMat = fillMat;
         rootGroup.add(group);
       }
     };
@@ -773,24 +798,34 @@ export function ConstellationCanvas({
 
     const draw = () => {
       rafId = 0;
-      tick += 0.012;
+      tick += 0.014;
 
-      // Smoothly interpolate pointer coordinates & lens strength
-      pointer.x += (pointer.targetX - pointer.x) * 0.18;
-      pointer.y += (pointer.targetY - pointer.y) * 0.18;
+      // Smoothly interpolate pointer coordinates & localized zoom strength
+      pointer.x += (pointer.targetX - pointer.x) * 0.16;
+      pointer.y += (pointer.targetY - pointer.y) * 0.16;
       const targetLens = pointer.active && mode === 'constellation' ? 1 : 0;
       pointer.lensStrength += (targetLens - pointer.lensStrength) * 0.14;
 
+      if (cursorLight) {
+        cursorLight.position.set(
+          pointer.x - cssWidth * 0.5,
+          cssHeight * 0.5 - pointer.y,
+          90 + pointer.lensStrength * 40
+        );
+        cursorLight.intensity = 1.2 + pointer.lensStrength * 1.6;
+      }
+
       for (const p of particles) {
         if (!prefersReducedMotion) {
-          p.x = p.baseX + Math.sin(tick + p.phase) * 6;
-          p.y = p.baseY + Math.cos(tick * 0.8 + p.phase) * 6;
+          // Independent, unaligned subtle floating motion per element
+          p.x = p.baseX + Math.sin(tick * p.freqX + p.phaseX) * p.ampX;
+          p.y = p.baseY + Math.cos(tick * p.freqY + p.phaseY) * p.ampY;
           p.angle += p.spin;
           p.tiltX += p.spinX;
           p.tiltY += p.spinY;
         }
 
-        // Compute localized zoom influence strictly inside LOCAL_ZOOM_RADIUS_PX
+        // Localized zoom strictly within LOCAL_ZOOM_RADIUS_PX around the cursor
         let targetScale = 1.0;
         let targetPushX = 0;
         let targetPushY = 0;
@@ -804,135 +839,55 @@ export function ConstellationCanvas({
 
           if (dist < LOCAL_ZOOM_RADIUS_PX) {
             const t = 1 - dist / LOCAL_ZOOM_RADIUS_PX;
-            // Smoothstep falloff so the boundary of the localized zoom is seamless
             const smooth = t * t * (3 - 2 * t) * pointer.lensStrength;
             targetInfluence = smooth;
             targetScale = 1 + smooth * (MAX_LOCAL_ZOOM_SCALE - 1);
-            targetAlpha = Math.min(1, p.alpha + smooth * 0.45);
+            targetAlpha = Math.min(1, p.alpha + smooth * 0.42);
 
-            // Optical magnifying lens radial push within the localized radius
             if (dist > 0.5) {
-              const pushMag = Math.sin(t * Math.PI) * 11 * pointer.lensStrength;
+              const pushMag = Math.sin(t * Math.PI) * 9 * pointer.lensStrength;
               targetPushX = (dx / dist) * pushMag;
               targetPushY = (dy / dist) * pushMag;
             }
           }
         }
 
-        p.currentScale += (targetScale - p.currentScale) * 0.16;
-        p.currentPushX += (targetPushX - p.currentPushX) * 0.16;
-        p.currentPushY += (targetPushY - p.currentPushY) * 0.16;
-        p.currentAlpha += (targetAlpha - p.currentAlpha) * 0.16;
-        p.zoomInfluence += (targetInfluence - p.zoomInfluence) * 0.16;
+        p.currentScale += (targetScale - p.currentScale) * 0.15;
+        p.currentPushX += (targetPushX - p.currentPushX) * 0.15;
+        p.currentPushY += (targetPushY - p.currentPushY) * 0.15;
+        p.currentAlpha += (targetAlpha - p.currentAlpha) * 0.15;
+        p.zoomInfluence += (targetInfluence - p.zoomInfluence) * 0.15;
 
         if (p.object3D) {
           const worldX = p.x + p.currentPushX - cssWidth * 0.5;
           const worldY = cssHeight * 0.5 - (p.y + p.currentPushY);
-          const worldZ = p.zoomInfluence * 35;
+          const worldZ = p.baseZ + p.zoomInfluence * 45;
 
           p.object3D.position.set(worldX, worldY, worldZ);
           p.object3D.rotation.set(
             p.tiltX,
             p.tiltY,
-            -p.angle - p.zoomInfluence * 0.35
+            -p.angle - p.zoomInfluence * 0.25
           );
           const s = p.size * p.currentScale;
           p.object3D.scale.set(s, s, s);
 
-          if (p.materials) {
-            const mainMat = p.materials[0] as THREE.LineBasicMaterial;
-            mainMat.opacity = p.currentAlpha;
-            if (p.materials[1]) {
-              (p.materials[1] as THREE.MeshBasicMaterial).opacity =
-                p.currentAlpha * (0.28 + p.zoomInfluence * 0.25);
-            }
+          if (p.lineMat) {
+            p.lineMat.opacity = p.currentAlpha;
+          }
+          if (p.fillMat) {
+            p.fillMat.opacity =
+              p.currentAlpha * (0.16 + p.zoomInfluence * 0.18);
           }
         }
       }
 
-      // Update 3D supporting filaments
       if (renderer && scene && camera) {
-        for (const link of supportLinks) {
-          if (!link.line3D || !link.lineMat) continue;
-          const a = particles[link.fromIndex];
-          const b = particles[link.toIndex];
-          const posAttr = link.line3D.geometry.getAttribute(
-            'position'
-          ) as THREE.BufferAttribute;
-          posAttr.setXYZ(
-            0,
-            a.x + a.currentPushX - cssWidth * 0.5,
-            cssHeight * 0.5 - (a.y + a.currentPushY),
-            -4
-          );
-          posAttr.setXYZ(
-            1,
-            b.x + b.currentPushX - cssWidth * 0.5,
-            cssHeight * 0.5 - (b.y + b.currentPushY),
-            -4
-          );
-          posAttr.needsUpdate = true;
-          const boost = Math.max(a.zoomInfluence, b.zoomInfluence);
-          link.lineMat.opacity = 0.12 + boost * 0.32;
-        }
         renderer.render(scene, camera);
-      }
-
-      // Render 2D overlay (subtle localized optical lens reticle on hover, or full 2D fallback if WebGL is unavailable)
-      if (overlayCtx) {
-        overlayCtx.clearRect(0, 0, cssWidth * dpr, cssHeight * dpr);
-
-        if (!renderer) {
-          // 2D fallback if WebGL is disabled
-          for (const link of supportLinks) {
-            const a = particles[link.fromIndex];
-            const b = particles[link.toIndex];
-            const boost = Math.max(a.zoomInfluence, b.zoomInfluence);
-            overlayCtx.save();
-            overlayCtx.strokeStyle = a.color;
-            overlayCtx.globalAlpha = 0.12 + boost * 0.32;
-            overlayCtx.lineWidth = 0.8 * dpr;
-            overlayCtx.beginPath();
-            overlayCtx.moveTo(
-              (a.x + a.currentPushX) * dpr,
-              (a.y + a.currentPushY) * dpr
-            );
-            overlayCtx.lineTo(
-              (b.x + b.currentPushX) * dpr,
-              (b.y + b.currentPushY) * dpr
-            );
-            overlayCtx.stroke();
-            overlayCtx.restore();
-          }
-          for (const p of particles) {
-            drawNode2D(overlayCtx, p, dpr);
-          }
-        }
-
-        // Subtle localized zoom lens ring under the cursor
-        if (pointer.lensStrength > 0.01 && mode === 'constellation') {
-          const lx = pointer.x * dpr;
-          const ly = pointer.y * dpr;
-          const lr = LOCAL_ZOOM_RADIUS_PX * dpr * (0.92 + pointer.lensStrength * 0.08);
-
-          overlayCtx.save();
-          const grad = overlayCtx.createRadialGradient(lx, ly, lr * 0.1, lx, ly, lr);
-          grad.addColorStop(0, `rgba(128, 82, 255, ${0.09 * pointer.lensStrength})`);
-          grad.addColorStop(0.65, `rgba(21, 132, 110, ${0.04 * pointer.lensStrength})`);
-          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-          overlayCtx.fillStyle = grad;
-          overlayCtx.beginPath();
-          overlayCtx.arc(lx, ly, lr, 0, Math.PI * 2);
-          overlayCtx.fill();
-
-          // Dashed calibration ring at the localized zoom boundary
-          overlayCtx.strokeStyle = `rgba(255, 184, 41, ${0.28 * pointer.lensStrength})`;
-          overlayCtx.lineWidth = 1 * dpr;
-          overlayCtx.setLineDash([5 * dpr, 7 * dpr]);
-          overlayCtx.beginPath();
-          overlayCtx.arc(lx, ly, lr, 0, Math.PI * 2);
-          overlayCtx.stroke();
-          overlayCtx.restore();
+      } else if (fallbackCtx) {
+        fallbackCtx.clearRect(0, 0, cssWidth * dpr, cssHeight * dpr);
+        for (const p of particles) {
+          drawNode2DFallback(fallbackCtx, p, dpr);
         }
       }
 
@@ -974,11 +929,8 @@ export function ConstellationCanvas({
     const handleResize = () => {
       cssWidth = Math.max(container.clientWidth, 1);
       cssHeight = Math.max(container.clientHeight, 1);
-      overlayCanvas.width = cssWidth * dpr;
-      overlayCanvas.height = cssHeight * dpr;
 
       particles = buildParticles(cssWidth, cssHeight);
-      supportLinks = buildSupportLinks(particles);
 
       if (renderer && camera) {
         camera.left = -cssWidth / 2;
@@ -988,6 +940,9 @@ export function ConstellationCanvas({
         camera.updateProjectionMatrix();
         renderer.setSize(cssWidth, cssHeight, false);
         populateThreeScene();
+      } else if (fallbackCtx) {
+        canvas.width = cssWidth * dpr;
+        canvas.height = cssHeight * dpr;
       }
       draw();
     };
@@ -1047,17 +1002,35 @@ export function ConstellationCanvas({
     <div
       ref={containerRef}
       aria-hidden="true"
-      className={`relative select-none ${
-        mode === 'constellation' ? 'cursor-crosshair' : 'pointer-events-none'
+      className={`relative select-none overflow-visible ${
+        mode === 'constellation' ? '' : 'pointer-events-none'
       } ${className}`}
+      style={
+        mode === 'constellation'
+          ? {
+              // Seamless edge attenuation so illumination and shapes never produce a hard cutoff line
+              WebkitMaskImage:
+                'radial-gradient(ellipse 94% 92% at 50% 50%, #000 74%, transparent 100%)',
+              maskImage:
+                'radial-gradient(ellipse 94% 92% at 50% 50%, #000 74%, transparent 100%)',
+            }
+          : undefined
+      }
     >
+      {/* Continuous, self-contained ambient illumination that fades out completely before any edge */}
+      {mode === 'constellation' && (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(closest-side at 50% 50%, rgba(128, 82, 255, 0.08) 0%, rgba(21, 132, 110, 0.03) 45%, transparent 85%)',
+          }}
+        />
+      )}
       <canvas
-        ref={webglCanvasRef}
-        className="w-full h-full block pointer-events-none"
-      />
-      <canvas
-        ref={overlayCanvasRef}
-        className="absolute inset-0 w-full h-full block pointer-events-none"
+        ref={canvasRef}
+        className="relative z-10 w-full h-full block pointer-events-none"
       />
     </div>
   );
