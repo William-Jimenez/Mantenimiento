@@ -2,6 +2,7 @@ import {
   Asignacion,
   Empleado,
   EstadoNombre,
+  PerfilUsuario,
   Solicitud,
   Usuario,
 } from '../types/domain';
@@ -17,12 +18,98 @@ export const ESTADOS_ORDEN: EstadoNombre[] = [
 
 export const ESTADOS_FINALES: EstadoNombre[] = ['Finalizada', 'Cancelada', 'Rechazada'];
 
+export const ETIQUETA_PERFIL: Record<PerfilUsuario, string> = {
+  ADMINISTRADOR: 'Administrador',
+  EMPLEADO: 'Empleado (Técnico)',
+  CLIENTE: 'Cliente',
+};
+
 export function esEstadoFinal(estado: EstadoNombre): boolean {
   return ESTADOS_FINALES.includes(estado);
 }
 
 /**
- * Matriz de permisos provisional (SU-03, PRD 1.7)
+ * Jerarquía de permisos por ruta (Frontend + Backend Route Guard):
+ * - ADMINISTRADOR: acceso total a todas las rutas.
+ * - EMPLEADO (técnico): acceso a inicio, bandeja técnica (/tecnico, /tecnico/solicitudes),
+ *   listado y detalle de sus solicitudes asignadas (/solicitudes, /solicitudes/:id).
+ *   Sin acceso a rutas administrativas (/admin/*) ni a creación de solicitudes de cliente (/solicitudes/nueva).
+ * - CLIENTE: acceso únicamente a inicio, crear solicitud (/solicitudes/nueva) y consultar sus propias
+ *   solicitudes (/solicitudes, /solicitudes/:id).
+ *   Sin acceso a rutas de empleado (/tecnico/*) ni de administrador (/admin/*).
+ */
+export function tienePermisoRuta(usuario: Usuario | null, pathname: string): boolean {
+  if (!usuario || !usuario.activo) {
+    return pathname === '/login';
+  }
+
+  if (usuario.debeCambiarPassword) {
+    return pathname === '/cuenta/contrasena';
+  }
+
+  const cleanPath = pathname.split('?')[0] || '/';
+
+  if (cleanPath === '/error') {
+    return true;
+  }
+
+  const esRutaAdmin = cleanPath === '/admin' || cleanPath.startsWith('/admin/');
+  const esRutaTecnico = cleanPath === '/tecnico' || cleanPath.startsWith('/tecnico/');
+  const esNuevaSolicitud = cleanPath === '/solicitudes/nueva';
+
+  if (usuario.perfil === 'ADMINISTRADOR') {
+    return true;
+  }
+
+  if (usuario.perfil === 'EMPLEADO') {
+    if (esRutaAdmin) return false;
+    if (esNuevaSolicitud) return false;
+    return (
+      cleanPath === '/' ||
+      esRutaTecnico ||
+      cleanPath === '/solicitudes' ||
+      /^\/solicitudes\/\d+$/.test(cleanPath)
+    );
+  }
+
+  if (usuario.perfil === 'CLIENTE') {
+    if (esRutaAdmin || esRutaTecnico) return false;
+    return (
+      cleanPath === '/' ||
+      esNuevaSolicitud ||
+      cleanPath === '/solicitudes' ||
+      /^\/solicitudes\/\d+$/.test(cleanPath)
+    );
+  }
+
+  return false;
+}
+
+export function puedeGestionarUsuarios(usuario: Usuario | null): boolean {
+  return !!usuario && usuario.activo && usuario.perfil === 'ADMINISTRADOR';
+}
+
+export function puedeAccederRutaEmpleado(usuario: Usuario | null): boolean {
+  return (
+    !!usuario &&
+    usuario.activo &&
+    (usuario.perfil === 'ADMINISTRADOR' || usuario.perfil === 'EMPLEADO')
+  );
+}
+
+export function puedeCrearSolicitud(usuario: Usuario | null): boolean {
+  return (
+    !!usuario &&
+    usuario.activo &&
+    (usuario.perfil === 'ADMINISTRADOR' || usuario.perfil === 'CLIENTE')
+  );
+}
+
+/**
+ * Control de visibilidad de solicitudes por rol:
+ * - ADMINISTRADOR: ve todas las solicitudes.
+ * - EMPLEADO (técnico): ve únicamente las solicitudes que tiene asignadas.
+ * - CLIENTE: ve únicamente las solicitudes realizadas por él mismo.
  */
 export function puedeVerSolicitud(
   usuario: Usuario,
@@ -30,10 +117,43 @@ export function puedeVerSolicitud(
   solicitud: Solicitud,
   asignacionVigente?: Asignacion
 ): boolean {
-  if (usuario.perfil === 'ADMINISTRADOR') return true;
-  if (solicitud.solicitanteId === empleado.id) return true;
-  if (empleado.esTecnico && asignacionVigente && asignacionVigente.tecnicoId === empleado.id) {
+  if (!usuario.activo || !empleado.activo) return false;
+
+  if (usuario.perfil === 'ADMINISTRADOR') {
     return true;
+  }
+
+  if (usuario.perfil === 'EMPLEADO') {
+    return !!asignacionVigente && asignacionVigente.tecnicoId === empleado.id;
+  }
+
+  if (usuario.perfil === 'CLIENTE') {
+    return solicitud.solicitanteId === empleado.id;
+  }
+
+  return false;
+}
+
+/**
+ * Permiso para registrar o actualizar el trabajo realizado en una solicitud:
+ * - ADMINISTRADOR: permitido en cualquier solicitud activa.
+ * - EMPLEADO (técnico): permitido únicamente en solicitudes asignadas a él en estado Asignada o En proceso.
+ * - CLIENTE: denegado.
+ */
+export function puedeRegistrarTrabajo(
+  usuario: Usuario,
+  empleado: Empleado,
+  solicitud: Solicitud,
+  asignacionVigente?: Asignacion
+): boolean {
+  if (esEstadoFinal(solicitud.estado)) return false;
+  if (usuario.perfil === 'ADMINISTRADOR') return true;
+  if (usuario.perfil === 'EMPLEADO') {
+    return (
+      !!asignacionVigente &&
+      asignacionVigente.tecnicoId === empleado.id &&
+      (solicitud.estado === 'Asignada' || solicitud.estado === 'En proceso')
+    );
   }
   return false;
 }
@@ -41,11 +161,22 @@ export function puedeVerSolicitud(
 export function puedeAdjuntarEvidencia(
   usuario: Usuario,
   empleado: Empleado,
-  solicitud: Solicitud
+  solicitud: Solicitud,
+  asignacionVigente?: Asignacion
 ): boolean {
   if (esEstadoFinal(solicitud.estado)) return false;
   if (usuario.perfil === 'ADMINISTRADOR') return true;
-  return solicitud.solicitanteId === empleado.id && solicitud.estado === 'Pendiente';
+  if (usuario.perfil === 'EMPLEADO') {
+    return (
+      !!asignacionVigente &&
+      asignacionVigente.tecnicoId === empleado.id &&
+      (solicitud.estado === 'Asignada' || solicitud.estado === 'En proceso')
+    );
+  }
+  if (usuario.perfil === 'CLIENTE') {
+    return solicitud.solicitanteId === empleado.id && solicitud.estado === 'Pendiente';
+  }
+  return false;
 }
 
 export function puedeAsignarTecnico(usuario: Usuario, solicitud: Solicitud): boolean {
@@ -68,7 +199,11 @@ export interface TransicionDisponible {
 }
 
 /**
- * Máquina de estados (SU-04, PRD 1.8)
+ * Máquina de estados por rol:
+ * - ADMINISTRADOR: control completo de transiciones operativas y administrativas.
+ * - EMPLEADO (técnico): en solicitudes asignadas a él, puede iniciar atención (Asignada -> En proceso)
+ *   y finalizar la reparación registrando el trabajo realizado (En proceso -> Finalizada).
+ * - CLIENTE: solo consulta el estado de sus propias solicitudes; no ejecuta transiciones técnicas ni administrativas.
  */
 export function obtenerTransicionesPermitidas(
   usuario: Usuario,
@@ -79,9 +214,8 @@ export function obtenerTransicionesPermitidas(
   if (esEstadoFinal(solicitud.estado)) return [];
 
   const esAdmin = usuario.perfil === 'ADMINISTRADOR';
-  const esSolicitante = solicitud.solicitanteId === empleado.id;
   const esTecnicoAsignado =
-    empleado.esTecnico &&
+    usuario.perfil === 'EMPLEADO' &&
     !!asignacionVigente &&
     asignacionVigente.tecnicoId === empleado.id;
 
@@ -95,8 +229,6 @@ export function obtenerTransicionesPermitidas(
         requiereMotivo: true,
         motivoOpcional: false,
       });
-    }
-    if (esAdmin || esSolicitante) {
       transiciones.push({
         destino: 'Cancelada',
         etiqueta: 'Cancelar solicitud',
@@ -132,7 +264,7 @@ export function obtenerTransicionesPermitidas(
     if (esAdmin || esTecnicoAsignado) {
       transiciones.push({
         destino: 'Finalizada',
-        etiqueta: 'Finalizar',
+        etiqueta: 'Finalizar reparación',
         requiereMotivo: false,
         motivoOpcional: true,
       });

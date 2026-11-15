@@ -197,17 +197,17 @@ export function LoginScreen() {
                     </button>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span>Empleado (empleado@empresa.com)</span>
+                    <span>Cliente (cliente@empresa.com)</span>
                     <button
                       type="button"
-                      onClick={() => prefill('empleado@empresa.com', 'Empleado2026')}
+                      onClick={() => prefill('cliente@empresa.com', 'Cliente2026')}
                       className="text-saffron-spark hover:underline cursor-pointer"
                     >
                       Usar
                     </button>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span>Contraseña temporal P-02 (mateo.rojas@empresa.com)</span>
+                    <span>Cliente · Clave temporal P-02 (mateo.rojas@empresa.com)</span>
                     <button
                       type="button"
                       onClick={() => prefill('mateo.rojas@empresa.com', 'Temporal2026')}

@@ -2,7 +2,7 @@
 
 **PROYECTO:** PLATAFORMA DE GESTIÓN INTEGRAL DE SOLICITUDES DE MANTENIMIENTO CON ANÁLISIS ASISTIDO POR IA  
 **DOCUMENTO:** Diagramas y Especificación de Diseño UML  
-**VERSIÓN:** 1.0  
+**VERSIÓN:** 1.1  
 **FECHA DE EMISIÓN:** 14 de noviembre de 2026  
 **ESTADO:** Aprobado para Fase de Construcción y Aseguramiento de Calidad (QA)  
 
@@ -36,30 +36,30 @@ Todos los diagramas están representados en sintaxis nativa **Mermaid** para gar
 
 ## 2. Diagrama de Casos de Uso del Sistema
 
-El siguiente diagrama agrupa los casos de uso del sistema según los actores principales del ecosistema corporativo: el **Administrador**, el **Empleado Solicitante**, el **Empleado Técnico** y el actor del sistema **Servicio de IA**:
+El siguiente diagrama agrupa los casos de uso del sistema según la jerarquía de tres roles de usuario del ecosistema corporativo (**Administrador**, **Empleado (Técnico)** y **Cliente**) junto con el actor del sistema **Servicio de IA**:
 
 ```mermaid
 flowchart LR
     %% Actores
     subgraph Actores["Actores del Sistema"]
-        Admin["👤 Administrador"]
-        Empleado["👤 Empleado Solicitante"]
-        Tecnico["👤 Empleado Técnico"]
+        Admin["👤 Administrador (Jefe)"]
+        Tecnico["👤 Empleado (Técnico)"]
+        Cliente["👤 Cliente (Solicitante)"]
         AIService["🤖 Servicio de IA (Sistema)"]
     end
 
     %% Casos de Uso
     subgraph CasosDeUso["Casos de Uso de la Plataforma"]
         CU01(["CU-01: Iniciar Sesión y Gestionar Clave"])
-        CU02(["CU-02: Gestionar Empleados y Cuentas"])
+        CU02(["CU-02: Gestionar Usuarios y Roles (RBAC)"])
         CU03(["CU-03: Administrar Catálogo de Recursos"])
         CU04(["CU-04: Radicar Solicitud de Mantenimiento"])
         CU05(["CU-05: Adjuntar y Validar Evidencias"])
         CU06(["CU-06: Asignar y Reasignar Técnicos"])
-        CU07(["CU-07: Iniciar Atención Operativa (En proceso)"])
+        CU07(["CU-07: Iniciar Atención y Registrar Trabajo Realizado"])
         CU08(["CU-08: Finalizar Solicitud (Cierre Técnico)"])
         CU09(["CU-09: Cancelar o Rechazar con Motivo"])
-        CU10(["CU-10: Consultar y Filtrar Solicitudes"])
+        CU10(["CU-10: Consultar y Filtrar Solicitudes según Rol"])
         CU11(["CU-11: Procesar Análisis Multimodal IA"])
         CU12(["CU-12: Revisar Dictamen y Sugerencias de IA"])
         CU13(["CU-13: Auditar Historial de Estados"])
@@ -78,11 +78,10 @@ flowchart LR
     Admin --> CU12
     Admin --> CU13
 
-    Empleado --> CU01
-    Empleado --> CU04
-    Empleado --> CU09
-    Empleado --> CU10
-    Empleado --> CU13
+    Cliente --> CU01
+    Cliente --> CU04
+    Cliente --> CU10
+    Cliente --> CU13
 
     Tecnico --> CU01
     Tecnico --> CU07
@@ -103,18 +102,18 @@ flowchart LR
 | Caso de Uso | Actores Primarios | Descripción y Propósito | Requerimiento Trazable |
 | :--- | :--- | :--- | :--- |
 | **CU-01: Iniciar Sesión y Gestionar Clave** | Todos los usuarios | Permite autenticar al usuario mediante credenciales institucionales seguras y fuerza el cambio de clave temporal si el indicador `debeCambiarPassword` está activo. | **RF-19**, **RNF-03**, **RNF-12** |
-| **CU-02: Gestionar Empleados y Cuentas** | Administrador | Permite registrar colaboradores, asociarles usuarios con perfiles `ADMINISTRADOR` o `EMPLEADO` y activar la marca funcional de técnico. | **RF-01**, **RF-02**, **RF-03** |
+| **CU-02: Gestionar Usuarios y Roles (RBAC)** | Administrador | Permite crear, editar, activar/desactivar usuarios y asignar o cambiar sus roles dentro de la jerarquía (`ADMINISTRADOR`, `EMPLEADO`, `CLIENTE`). Bloqueado en UI y API (`HTTP 403`) para Empleados y Clientes. | **RF-01**, **RF-02**, **RF-03**, **RNF-04** |
 | **CU-03: Administrar Catálogo de Recursos** | Administrador | Permite dar de alta, editar y categorizar los activos de la empresa en las cuatro tipologías canónicas (Equipo, Instalación, Maquinaria, Herramienta). | **RF-04** |
-| **CU-04: Radicar Solicitud de Mantenimiento** | Empleado, Administrador | Permite emitir una nueva solicitud seleccionando un recurso activo, ingresando la descripción del daño y generando el código único de seguimiento. | **RF-05**, **RF-06** |
-| **CU-05: Adjuntar y Validar Evidencias** | Empleado, Administrador | Proceso embebido (*include*) que valida en el servidor que las fotos (JPEG/PNG) y PDF cumplan con límites de tamaño y no contengan código malicioso. | **RF-07**, **RNF-05** |
-| **CU-06: Asignar y Reasignar Técnicos** | Administrador | Asocia formalmente a un especialista técnico activo con una solicitud, cerrando cualquier asignación anterior y mutando el estado a `Asignada`. | **RF-11**, **RNF-02** |
-| **CU-07: Iniciar Atención Operativa** | Empleado Técnico, Administrador | Transiciona la solicitud de `Asignada` a `En proceso`, marcando el arranque formal de la labor física o de inspección. | **RF-12** |
-| **CU-08: Finalizar Solicitud (Cierre)** | Empleado Técnico, Administrador | Concluye la intervención técnica, registra la descripción de la solución y sella la solicitud en el estado terminal `Finalizada`. | **RF-13** |
-| **CU-09: Cancelar o Rechazar con Motivo** | Empleado (solo cancelar en Pendiente), Administrador | Permite dar de baja o desestimar solicitudes, exigiendo un texto de motivo obligatorio de al menos 10 caracteres. | **RF-14**, **RF-15** |
-| **CU-10: Consultar y Filtrar Solicitudes** | Todos los usuarios | Provee la bandeja paginada de solicitudes aplicando el control de acceso en servidor (los empleados solo ven lo suyo; el admin ve todo). | **RF-08**, **RF-09**, **RNF-04** |
+| **CU-04: Radicar Solicitud de Mantenimiento** | Cliente, Administrador | Permite emitir una nueva solicitud seleccionando un recurso activo, ingresando la descripción del daño y generando el código único de seguimiento. | **RF-05**, **RF-06** |
+| **CU-05: Adjuntar y Validar Evidencias** | Cliente, Empleado (Técnico), Administrador | Proceso que valida que las fotos (JPEG/PNG) y PDF cumplan con límites de tamaño y tipo MIME, permitiendo soporte visual tanto del reporte inicial como de la reparación técnica. | **RF-07**, **RNF-05** |
+| **CU-06: Asignar y Reasignar Técnicos** | Administrador | Asocia formalmente a un Empleado técnico activo con una solicitud, cerrando cualquier asignación anterior y mutando el estado a `Asignada`. | **RF-11**, **RNF-02** |
+| **CU-07: Iniciar Atención y Registrar Trabajo Realizado** | Empleado (Técnico), Administrador | Transiciona la solicitud de `Asignada` a `En proceso` y permite documentar en el campo `trabajoRealizado` el detalle técnico de la intervención ejecutada sobre el activo. | **RF-12** |
+| **CU-08: Finalizar Solicitud (Cierre)** | Empleado (Técnico), Administrador | Concluye la intervención técnica, registra la descripción del trabajo y sella la solicitud en el estado terminal `Finalizada`. | **RF-13** |
+| **CU-09: Cancelar o Rechazar con Motivo** | Administrador | Permite dar de baja o desestimar solicitudes, exigiendo un texto de motivo obligatorio de al menos 10 caracteres. | **RF-14**, **RF-15** |
+| **CU-10: Consultar y Filtrar Solicitudes según Rol** | Todos los usuarios | Provee la bandeja de solicitudes aplicando RBAC en interfaz y backend: el `CLIENTE` solo ve sus propias solicitudes sin datos de empleados ni de otros clientes; el `EMPLEADO` solo ve las solicitudes asignadas a él; el `ADMINISTRADOR` ve todas. | **RF-08**, **RF-09**, **RNF-04** |
 | **CU-11: Procesar Análisis Multimodal IA** | Servicio de IA (Sistema) | Ejecución en segundo plano que analiza descripción y archivos binarios para inferir el tipo de daño y sugerir categoría y prioridad. | **RF-16**, **RF-17**, **RNF-06** |
 | **CU-12: Revisar Dictamen y Sugerencias IA** | Administrador | Panel de soberanía humana para Aceptar, Modificar o Descartar las recomendaciones emitidas por la inteligencia artificial. | **RF-18** |
-| **CU-13: Auditar Historial de Estados** | Todos los usuarios autorizados | Muestra la línea de tiempo inmutable con el registro cronológico de quién, cuándo y por qué ejecutó cada transición. | **RF-20**, **RNF-11** |
+| **CU-13: Auditar Historial de Estados** | Todos los usuarios autorizados | Muestra la línea de tiempo inmutable con el registro cronológico de cada transición (con identidades anonimizadas de personal interno cuando consulta un `CLIENTE`). | **RF-20**, **RNF-11** |
 
 ---
 
@@ -129,6 +128,7 @@ classDiagram
         <<enumeration>>
         ADMINISTRADOR
         EMPLEADO
+        CLIENTE
     }
 
     class TipoRecursoNombre {
@@ -244,6 +244,8 @@ classDiagram
         +EstadoNombre estado
         +Long categoriaId
         +Long prioridadId
+        +String trabajoRealizado
+        +LocalDateTime trabajoActualizadoEn
         +String motivoCierre
         +LocalDateTime creadaEn
         +LocalDateTime actualizadaEn

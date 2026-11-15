@@ -2,7 +2,7 @@
 
 **PROYECTO:** PLATAFORMA DE GESTIÓN INTEGRAL DE SOLICITUDES DE MANTENIMIENTO CON ANÁLISIS ASISTIDO POR IA  
 **DOCUMENTO:** Software Requirements Specification (SRS)  
-**VERSIÓN:** 1.0  
+**VERSIÓN:** 1.1  
 **FECHA DE EMISIÓN:** 14 de noviembre de 2026  
 **ESTÁNDAR DE REFERENCIA:** IEEE Std 830-1998 / ISO/IEC/IEEE 29148:2018  
 **ESTADO:** Aprobado para Fase de Construcción y Aseguramiento de Calidad (QA)  
@@ -104,7 +104,7 @@ Para sustentar la elección arquitectónica y de alcance del proyecto, se evalua
 Diseñar, implementar e integrar una plataforma web robusta para la gestión corporativa de solicitudes de mantenimiento en una organización, que centralice el inventario de activos clasificados, gestione el flujo de solicitudes a través de una máquina de seis estados, regule la asignación a empleados técnicos y asista el análisis descriptivo y de criticidad mediante inteligencia artificial multimodal.
 
 #### 1.4.2 Objetivos Específicos
-1. **Módulo M1 - Identidad y Seguridad:** Implementar el control de acceso, registro de empleados y autenticación de usuarios mediante credenciales seguras, segregando perfiles de Administrador y Empleado con políticas estrictas de sesión.
+1. **Módulo M1 - Identidad y Seguridad (RBAC Jerárquico):** Implementar el control de acceso por rol (RBAC) en interfaz y backend bajo una jerarquía de tres tipos de usuario: **Administrador** (`ADMINISTRADOR`), **Empleado / Técnico** (`EMPLEADO`) y **Cliente** (`CLIENTE`), con políticas estrictas de sesión y bloqueo de peticiones directas no autorizadas a la API.
 2. **Módulo M2 - Gestión de Activos:** Construir el catálogo maestro de recursos físicos clasificados obligatoriamente en cuatro tipologías (Equipo tecnológico, Instalación o edificio, Maquinaria y Herramienta), garantizando su localización física y estado operativo.
 3. **Módulo M3 - Registro y Evidencias:** Desarrollar el mecanismo de radicación de solicitudes por parte de solicitantes o administradores, integrando la captura de descripciones detalladas y adjunción de evidencias documentales (PDF) y gráficas (JPEG/PNG) con validación de tipo MIME por contenido.
 4. **Módulo M4 - Técnicos y Asignaciones:** Establecer el módulo de gestión técnica que distinga a los empleados con labores de mantenimiento y permita la asignación y reasignación manual de solicitudes, conservando una única asignación activa y un registro histórico de intervenciones.
@@ -117,8 +117,8 @@ Diseñar, implementar e integrar una plataforma web robusta para la gestión cor
 
 #### 1.5.1 Alcance Incluido (Línea Base Confirmada)
 - Aplicación web con diseño responsivo operable en dispositivos móviles y de escritorio.
-- Gestión de usuarios y empleados bajo dos perfiles: **Administrador** y **Empleado**.
-- Identificación de la función de **Empleado Técnico** como atributo funcional sobre la entidad Empleado.
+- Gestión de usuarios bajo una jerarquía de tres perfiles con control de acceso por rol (RBAC) en frontend y backend: **Administrador** (`ADMINISTRADOR`), **Empleado / Técnico** (`EMPLEADO`) y **Cliente** (`CLIENTE`).
+- Registro del trabajo técnico realizado (`trabajoRealizado`) sobre las solicitudes asignadas por parte del Empleado técnico o Administrador.
 - Módulo de recursos con códigos únicos de activo, tipo de recurso, nombre, descripción y ubicación.
 - Cuatro tipos canónicos de recursos: *Equipo tecnológico*, *Instalación o edificio*, *Maquinaria* y *Herramienta*.
 - Registro de solicitudes por empleados (propias) y administradores (en nombre de cualquier empleado).
@@ -264,41 +264,38 @@ flowchart TD
 
 ### 2.2 Características y Taxonomía de Usuarios
 
-El sistema clasifica formalmente a sus actores e interactuantes en las siguientes categorías:
+El sistema clasifica formalmente a sus usuarios bajo una jerarquía de tres roles (`PerfilUsuario`) más el actor de sistema de Inteligencia Artificial:
 
-| Actor / Perfil | Tipo de Actor | Descripción y Contexto Operativo | Nivel de Experticia Tecnológica |
+| Actor / Perfil (`PerfilUsuario`) | Tipo de Actor | Descripción y Contexto Operativo | Nivel de Experticia Tecnológica |
 | :--- | :--- | :--- | :--- |
-| **Administrador** | Perfil de Usuario | Personal responsable del departamento de mantenimiento o infraestructura. Posee control maestro sobre usuarios, catálogo de recursos, asignación de solicitudes, revisión de resultados de IA y transiciones de estado de toda la empresa. | Intermedio a Avanzado. |
-| **Empleado** | Perfil de Usuario | Cualquier colaborador perteneciente a la nómina de la empresa que requiera reportar una falla en los activos que utiliza para su labor. Puede radicar solicitudes, adjuntar evidencias y hacer seguimiento a sus propios casos. | Básico a Intermedio. |
-| **Empleado Técnico** | Atributo Funcional sobre Empleado | Colaborador con perfil Empleado que cuenta con la marca funcional `es_tecnico = true`. Posee la capacidad de visualizar las solicitudes vigentes asignadas a su persona, actualizar su avance hacia `En proceso` y registrar el cierre técnico hacia `Finalizada`. No constituye un perfil de acceso separado en la base de datos. | Básico a Intermedio. |
+| **Administrador (`ADMINISTRADOR`)** | Rol de Usuario (Nivel 1 - Jefe) | Jefe de todos los empleados. Posee control total sobre el sistema: gestionar usuarios (crear, editar, activar/desactivar, cambiar roles), asignar solicitudes a técnicos, ver todas las solicitudes con su estado, revisar sugerencias de IA y acceder a cualquier funcionalidad del sistema. | Intermedio a Avanzado. |
+| **Empleado / Técnico (`EMPLEADO`)** | Rol de Usuario (Nivel 2 - Técnico) | Especialista que repara las solicitudes que los clientes realizan. Puede ver únicamente las solicitudes que se le asignan, actualizar su estado (`Asignada` &rarr; `En proceso` &rarr; `Finalizada`) y registrar el trabajo realizado (`trabajoRealizado`), pero no puede gestionar usuarios ni ver solicitudes que no le correspondan. | Básico a Intermedio. |
+| **Cliente (`CLIENTE`)** | Rol de Usuario (Nivel 3 - Solicitante) | Usuario que solicita mantenimiento desde la página web y consulta el estado de sus propias solicitudes. No puede ver datos personales de otros clientes, ni de empleados, ni acceder a funciones o rutas de técnicos o administrativas. | Básico. |
 | **Servicio de IA** | Actor de Sistema | Microservicio o API de Inteligencia Artificial que recibe la carga útil (descripción textual y binarios de fotografías/documentos) y retorna inferencias técnicas estructuradas. | No aplica (Interacción machine-to-machine vía API). |
 
 ---
 
 ### 2.3 Matriz Canónica de Permisos y Control de Acceso
 
-El sistema hace cumplir de forma estricta y a nivel de servidor la siguiente matriz de privilegios:
+El sistema hace cumplir de forma estricta —tanto en la interfaz web como en los endpoints del backend (`/api/*`)— la siguiente matriz de privilegios por rol:
 
-| Acción en el Sistema | Administrador | Empleado Solicitante | Empleado Técnico Asignado |
+| Acción / Ruta en el Sistema | Administrador (`ADMINISTRADOR`) | Empleado / Técnico (`EMPLEADO`) | Cliente (`CLIENTE`) |
 | :--- | :---: | :---: | :---: |
-| Autenticarse e iniciar/cerrar sesión | **Sí** | **Sí** | **Sí** |
+| Autenticarse e iniciar/cerrar sesión (`/login`) | **Sí** | **Sí** | **Sí** |
 | Cambiar contraseña propia o temporal | **Sí** | **Sí** | **Sí** |
-| Registrar y modificar empleados y usuarios | **Sí** | No | No |
-| Asignar o revocar marca de Empleado Técnico | **Sí** | No | No |
-| Crear y administrar catálogo de recursos y categorías | **Sí** | No | No |
-| Registrar solicitud a nombre propio | **Sí** | **Sí** | **Sí** |
-| Registrar solicitud en nombre de un tercero | **Sí** | No | No |
+| Gestionar usuarios: crear, editar, desactivar y cambiar roles (`/usuarios`, `/api/admin/usuarios`) | **Sí** | No (`403`) | No (`403`) |
+| Acceder al Panel de Control y métricas operativas (`/`, `/api/tecnico/*`) | **Sí** (vista global) | **Sí** (solo asignadas) | No (`403` / redirigido a `/solicitudes`) |
+| Registrar solicitud de mantenimiento (`/solicitudes/nueva`, `POST /api/solicitudes`) | **Sí** (propia o tercero) | No (`403`) | **Sí** (solo propia) |
 | Consultar solicitudes de toda la organización | **Sí** | No | No |
-| Consultar solicitudes propias | **Sí** | **Sí** | **Sí** |
-| Consultar solicitudes asignadas técnicamente | **Sí** | No | **Sí** (solo las asignadas) |
-| Adjuntar evidencias (fotos / PDF) | **Sí** (en solicitudes abiertas) | **Sí** (solo estado Pendiente) | No |
-| Asignar o reasignar técnico responsable | **Sí** | No | No |
-| Pasar solicitud a estado `En proceso` | **Sí** | No | **Sí** (si está asignado) |
-| Pasar solicitud a estado `Finalizada` | **Sí** | No | **Sí** (si está asignado) |
-| Rechazar solicitud (con motivo obligatorio) | **Sí** | No | No |
-| Cancelar solicitud (con motivo obligatorio) | **Sí** | **Sí** (solo en Pendiente) | No |
+| Consultar solicitudes asignadas técnicamente | **Sí** | **Sí** (solo las asignadas a él) | No |
+| Consultar solicitudes propias (`/solicitudes`, `GET /api/solicitudes`) | **Sí** | No | **Sí** (sin datos de empleados ni otros clientes) |
+| Adjuntar evidencias (fotos / PDF) | **Sí** (en abiertas) | **Sí** (en asignadas abiertas) | **Sí** (en propias abiertas) |
+| Asignar o reasignar técnico responsable (`POST /api/admin/solicitudes/:id/asignar`) | **Sí** | No (`403`) | No (`403`) |
+| Registrar el trabajo técnico realizado (`PATCH /api/tecnico/solicitudes/:id/trabajo`) | **Sí** | **Sí** (solo en asignadas) | No (`403`) |
+| Actualizar estado a `En proceso` o `Finalizada` (`PATCH /api/tecnico/solicitudes/:id/estado`) | **Sí** | **Sí** (solo en asignadas) | No (`403`) |
+| Cancelar o rechazar solicitud (con motivo obligatorio) | **Sí** | No (`403`) | No (`403`) |
 | Revisar análisis de IA (Aceptar / Modificar / Descartar) | **Sí** | No | No |
-| Consultar resultados generados por IA | **Sí** | **Sí** (solo de sus solicitudes) | **Sí** (solo de las asignadas) |
+| Consultar resultados de IA y trabajo realizado | **Sí** | **Sí** (solo de las asignadas) | **Sí** (solo de sus propias solicitudes) |
 
 ---
 
@@ -893,11 +890,11 @@ A continuación se detallan los 12 Requerimientos No Funcionales del sistema, in
 
 | Plataforma de Mantenimiento | Requerimiento No Funcional |
 | :--- | :--- |
-| **Código:** RNF-04 | **Nombre:** Control de Acceso Robusto y Autorización en Servidor |
+| **Código:** RNF-04 | **Nombre:** Control de Acceso Robusto y Autorización en Servidor (RBAC de 3 Roles) |
 | **Grado de Necesidad:** Alta | **Categoría:** Seguridad y Autorización |
-| **Descripción:** | Aplicación de privilegios en el backend impidiendo la elusión de reglas desde el cliente. |
-| **Detalle Técnico Verificable:** | El 100% de los endpoints de la API y vistas privadas deben evaluar la sesión y el perfil antes de despachar información. Un Empleado no podrá obtener bajo ninguna circunstancia datos de una solicitud no propia, incluso forzando el ID en las solicitudes HTTP (debe retornar 403 Forbidden). |
-| **Efectos Colaterales:** | Exige validaciones cruzadas entre el usuario autenticado y el campo `solicitante_id` en las consultas del repositorio. |
+| **Descripción:** | Aplicación de privilegios por rol (`ADMINISTRADOR`, `EMPLEADO`, `CLIENTE`) tanto en la interfaz como en el backend, impidiendo la elusión de reglas desde el cliente o mediante peticiones HTTP directas. |
+| **Detalle Técnico Verificable:** | El 100% de los endpoints de la API (`/api/*`) y las rutas del cliente evalúan la sesión (`401 Unauthorized`) y el rol (`403 Forbidden`) antes de despachar o mutar información, verificado mediante la suite automatizada `tests/rbac.test.ts`:<br>- Un `CLIENTE` tiene bloqueado el acceso a rutas de `EMPLEADO` (`/api/tecnico/*`) y de `ADMINISTRADOR` (`/api/admin/*`, `/usuarios`), y en `/api/solicitudes` recibe únicamente sus propias solicitudes sanitizadas sin datos de empleados ni de otros clientes.<br>- Un `EMPLEADO` tiene bloqueada la gestión de usuarios (`/api/admin/usuarios`) y solo puede consultar, actualizar estado y registrar trabajo realizado en las solicitudes que le fueron asignadas. |
+| **Efectos Colaterales:** | Exige validaciones cruzadas en servidor (`requireAuth`, `requireRole`) y sanitización de payloads según el perfil autenticado. |
 
 | Plataforma de Mantenimiento | Requerimiento No Funcional |
 | :--- | :--- |

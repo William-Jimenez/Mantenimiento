@@ -10,6 +10,7 @@ export function DashboardScreen() {
     currentEmpleado,
     isAdmin,
     isTecnico,
+    isCliente,
     navigate,
     setFiltrosSolicitudes,
     recursos,
@@ -27,10 +28,10 @@ export function DashboardScreen() {
   const irAListadoFiltrado = (estado?: EstadoNombre) => {
     setFiltrosSolicitudes({
       estados: estado ? [estado] : [],
-      soloAsignadasAMi: false,
+      soloAsignadasAMi: isTecnico,
       page: 0,
     });
-    navigate('/solicitudes');
+    navigate(isTecnico ? '/tecnico/solicitudes' : '/solicitudes');
   };
 
   const recientes = [...visibles]
@@ -60,25 +61,31 @@ export function DashboardScreen() {
               {isAdmin
                 ? 'Panel de Administración'
                 : isTecnico
-                ? 'Panel de Empleado · Función Técnica'
-                : 'Panel de Empleado'}
+                ? 'Panel de Empleado · Técnico de Mantenimiento'
+                : 'Portal de Cliente · Solicitudes de Mantenimiento'}
             </p>
             <h1 className="text-[42px] sm:text-[60px] lg:text-[72px] leading-[1.05] tracking-[-1.68px] lg:tracking-[-2.88px] text-bone-white">
               Hola, {currentEmpleado?.nombres}.
             </h1>
             <p className="body-ultralight text-silver-mist max-w-[540px]">
               {isAdmin
-                ? 'Supervise todas las solicitudes de mantenimiento de la empresa, asigne técnicos responsables y revise el seguimiento operativo.'
+                ? 'Gestione usuarios y roles, supervise todas las solicitudes de mantenimiento de la empresa y asigne técnicos responsables.'
                 : isTecnico
-                ? 'Consulte las solicitudes asignadas a su nombre para atenderlas, y registre o siga sus propios reportes.'
-                : 'Registre nuevas solicitudes de mantenimiento con evidencias y consulte el avance de cada caso.'}
+                ? 'Consulte las solicitudes asignadas a su cargo, actualice su estado operativo y registre el trabajo de reparación realizado.'
+                : 'Solicite mantenimiento desde la página web y consulte en tiempo real el estado de sus propias solicitudes.'}
             </p>
           </div>
 
           <div className="shrink-0">
-            <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
-              Nueva solicitud
-            </PrimaryButton>
+            {isTecnico ? (
+              <PrimaryButton onClick={() => navigate('/tecnico/solicitudes')}>
+                Ver mis solicitudes asignadas
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
+                Nueva solicitud
+              </PrimaryButton>
+            )}
           </div>
         </div>
       </section>
@@ -87,7 +94,11 @@ export function DashboardScreen() {
       <section aria-labelledby="resumen-estados-titulo" className="space-y-[24px]">
         <div className="flex items-center justify-between gap-4">
           <h2 id="resumen-estados-titulo" className="text-[24px] tracking-[-0.48px] text-bone-white">
-            {isAdmin ? 'Todas las solicitudes por estado' : 'Mis solicitudes por estado'}
+            {isAdmin
+              ? 'Todas las solicitudes por estado'
+              : isTecnico
+              ? 'Mis solicitudes asignadas por estado'
+              : 'Estado de mis solicitudes'}
           </h2>
           <GhostButton onClick={() => irAListadoFiltrado()}>
             Ver listado completo →
@@ -251,24 +262,38 @@ export function DashboardScreen() {
       {/* 5 most recent requests (User Flow 4.2) */}
       <section aria-labelledby="recientes-titulo" className="space-y-[24px]">
         <h2 id="recientes-titulo" className="text-[24px] tracking-[-0.48px] text-bone-white">
-          {isAdmin ? 'Solicitudes recientes' : 'Mis 5 solicitudes más recientes'}
+          {isAdmin
+            ? 'Solicitudes recientes'
+            : isTecnico
+            ? 'Mis asignaciones más recientes'
+            : 'Mis 5 solicitudes más recientes'}
         </h2>
 
         {recientes.length === 0 ? (
           <EmptyState
-            title="Aún no tiene solicitudes. Registre la primera"
-            description="Describa el daño, seleccione el recurso afectado y adjunte fotografías o documentos PDF si dispone de ellos."
+            title={
+              isTecnico
+                ? 'No tiene solicitudes asignadas actualmente'
+                : 'Aún no tiene solicitudes. Registre la primera'
+            }
+            description={
+              isTecnico
+                ? 'Solo verá en su bandeja las solicitudes que el Administrador le asigne para reparación.'
+                : 'Describa el daño, seleccione el recurso afectado y adjunte fotografías o documentos PDF si dispone de ellos.'
+            }
             action={
-              <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
-                Nueva solicitud
-              </PrimaryButton>
+              !isTecnico ? (
+                <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
+                  Nueva solicitud
+                </PrimaryButton>
+              ) : undefined
             }
           />
         ) : (
           <div className="border-t border-white/12 divide-y divide-white/10">
             {recientes.map((sol) => {
               const rec = recursos.find((r) => r.id === sol.recursoId);
-              const solEmp = empleados.find((e) => e.id === sol.solicitanteId);
+              const solEmp = !isCliente ? empleados.find((e) => e.id === sol.solicitanteId) : undefined;
               return (
                 <button
                   key={sol.id}

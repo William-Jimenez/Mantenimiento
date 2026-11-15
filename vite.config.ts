@@ -2,10 +2,21 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {createApiApp} from './src/server/apiApp';
 
 export default defineConfig(() => {
+  const apiApp = createApiApp();
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'rbac-api-backend',
+        configureServer(server) {
+          server.middlewares.use(apiApp);
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

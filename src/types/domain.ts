@@ -1,4 +1,4 @@
-export type PerfilUsuario = 'ADMINISTRADOR' | 'EMPLEADO';
+export type PerfilUsuario = 'ADMINISTRADOR' | 'EMPLEADO' | 'CLIENTE';
 
 export type EstadoNombre =
   | 'Pendiente'
@@ -140,6 +140,8 @@ export interface Solicitud {
   estado: EstadoNombre;
   categoriaId: number | null;
   prioridadId: number | null;
+  trabajoRealizado?: string | null;
+  trabajoActualizadoEn?: string | null;
   motivoCierre: string | null;
   creadaEn: string;
   actualizadaEn: string;

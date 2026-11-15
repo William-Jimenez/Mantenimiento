@@ -2,7 +2,7 @@
 
 **PROYECTO:** PLATAFORMA DE GESTIÓN INTEGRAL DE SOLICITUDES DE MANTENIMIENTO CON ANÁLISIS ASISTIDO POR IA  
 **DOCUMENTO:** Modelo Entidad-Relación y Especificación de Persistencia Relacional  
-**VERSIÓN:** 1.0  
+**VERSIÓN:** 1.1  
 **FECHA DE EMISIÓN:** 14 de noviembre de 2026  
 **MOTOR DE BASE DE DATOS:** MySQL 8.4 LTS (Motor Transaccional InnoDB)  
 **ESTADO:** Aprobado para Fase de Construcción y Aseguramiento de Calidad (QA)  
@@ -140,6 +140,8 @@ erDiagram
         bigint estado_id FK
         bigint categoria_id FK
         bigint prioridad_id FK
+        varchar_2000 trabajo_realizado
+        datetime trabajo_actualizado_en
         varchar_500 motivo_cierre
         datetime creada_en
         datetime actualizada_en
@@ -233,7 +235,7 @@ erDiagram
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | `id` | BIGINT UNSIGNED | NO | **PK**, AUTO_INCREMENT | N/A | Identificador único de la cuenta de usuario. |
 | `empleado_id` | BIGINT UNSIGNED | NO | **FK**, **UNIQUE** | N/A | Enlace 1:1 con `empleado.id`. Restricción `ON DELETE RESTRICT`. |
-| `perfil` | ENUM('ADMINISTRADOR','EMPLEADO') | NO | Ninguna | N/A | Perfil de acceso formal del usuario (RBAC). |
+| `perfil` | ENUM('ADMINISTRADOR','EMPLEADO','CLIENTE') | NO | Ninguna | N/A | Jerarquía de rol RBAC: `ADMINISTRADOR` (jefe con control total), `EMPLEADO` (técnico reparador de solicitudes asignadas) o `CLIENTE` (solicitante con acceso restringido a sus propios reportes). |
 | `password_hash` | VARCHAR(100) | NO | Ninguna | N/A | Hash criptográfico seguro generado mediante algoritmo BCrypt (costo >= 10). |
 | `debe_cambiar_password` | BOOLEAN | NO | Ninguna | `1` (true) | Si es `1`, fuerza la redirección al cambio de clave al iniciar sesión (RF-19). |
 | `intentos_fallidos` | TINYINT UNSIGNED | NO | Ninguna | `0` | Contador de intentos fallidos. Al llegar a 5 bloquea temporalmente la cuenta. |
@@ -325,6 +327,8 @@ erDiagram
 | `estado_id` | BIGINT UNSIGNED | NO | **FK** | N/A | FK a `estado.id`. Estado actual gobernado por la máquina de transiciones. |
 | `categoria_id` | BIGINT UNSIGNED | SÍ | **FK** | NULL | FK a `categoria.id`. Asignada o aceptada oficialmente por el Administrador. |
 | `prioridad_id` | BIGINT UNSIGNED | SÍ | **FK** | NULL | FK a `prioridad.id`. Nivel de criticidad oficial aprobado por el Administrador. |
+| `trabajo_realizado` | VARCHAR(2000) | SÍ | Ninguna | NULL | Bitácora técnica del trabajo de reparación ejecutado por el Empleado (técnico) asignado o el Administrador. |
+| `trabajo_actualizado_en` | DATETIME(0) | SÍ | Ninguna | NULL | Estampa de tiempo UTC de la última actualización del trabajo técnico realizado. |
 | `motivo_cierre` | VARCHAR(500) | SÍ | Ninguna | NULL | Justificación obligatoria en cancelación/rechazo, u observación de cierre técnico. |
 | `creada_en` | DATETIME(0) | NO | Ninguna | CURRENT_TIMESTAMP | Estampa de tiempo UTC de apertura del reporte. |
 | `actualizada_en`| DATETIME(0) | NO | Ninguna | CURRENT_TIMESTAMP | Estampa de tiempo UTC de la última modificación. |

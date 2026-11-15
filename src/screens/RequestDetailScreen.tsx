@@ -9,6 +9,8 @@ import {
   obtenerTransicionesPermitidas,
   puedeAdjuntarEvidencia,
   puedeAsignarTecnico,
+  puedeCrearSolicitud,
+  puedeRegistrarTrabajo,
   puedeRevisarIa,
   puedeVerSolicitud,
   TransicionDisponible,
@@ -35,6 +37,8 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
     currentUser,
     currentEmpleado,
     isAdmin,
+    isTecnico,
+    isCliente,
     solicitudes,
     empleados,
     usuarios,
@@ -49,6 +53,7 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
     iaHabilitada,
     navigate,
     asignarTecnico,
+    registrarTrabajoRealizado,
     cambiarEstadoSolicitud,
     agregarEvidencias,
     solicitarNuevoAnalisisIa,
@@ -89,6 +94,9 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
   } | null>(null);
 
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [modalTrabajoOpen, setModalTrabajoOpen] = useState(false);
+  const [textoTrabajo, setTextoTrabajo] = useState('');
+  const [trabajoError, setTrabajoError] = useState<string | null>(null);
 
   if (
     !currentUser ||
@@ -153,11 +161,41 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
     asignacionVigente
   );
   const puedeAsignar = puedeAsignarTecnico(currentUser, solicitud);
+  const puedeRegistrar = puedeRegistrarTrabajo(
+    currentUser,
+    currentEmpleado,
+    solicitud,
+    asignacionVigente
+  );
   const puedeAdjuntar = puedeAdjuntarEvidencia(
     currentUser,
     currentEmpleado,
-    solicitud
+    solicitud,
+    asignacionVigente
   );
+
+  const handleOpenTrabajo = () => {
+    setTrabajoError(null);
+    setTextoTrabajo(solicitud.trabajoRealizado ?? '');
+    setModalTrabajoOpen(true);
+  };
+
+  const handleConfirmTrabajo = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTrabajoError(null);
+    setSavingModal(true);
+    const res = registrarTrabajoRealizado(
+      solicitud.id,
+      textoTrabajo,
+      solicitud.version
+    );
+    setSavingModal(false);
+    if (!res.ok) {
+      setTrabajoError(res.error ?? 'No se pudo registrar el trabajo realizado.');
+      return;
+    }
+    setModalTrabajoOpen(false);
+  };
 
   const tecnicosActivos = empleados.filter((e) => e.activo && e.esTecnico);
 
@@ -302,10 +340,10 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
       {/* Top navigation / arrival confirmation (FIN-02 / FIN-03 / FIN-08) */}
       <div className="space-y-[18px]">
         <div className="flex flex-wrap items-center justify-between gap-[12px]">
-          <GhostButton onClick={() => navigate('/solicitudes')}>
+          <GhostButton onClick={() => navigate(isTecnico ? '/tecnico/solicitudes' : '/solicitudes')}>
             ← Volver al listado
           </GhostButton>
-          {esNueva && (
+          {esNueva && puedeCrearSolicitud(currentUser) && (
             <div className="flex flex-wrap items-center gap-[12px]">
               <GhostButton onClick={() => navigate('/solicitudes/nueva')}>
                 Registrar otra solicitud
@@ -358,6 +396,13 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
                   {asignacionVigente ? 'Cambiar técnico' : 'Asignar técnico'}
                 </PrimaryButton>
               )}
+              {puedeRegistrar && (
+                <OutlineButton onClick={handleOpenTrabajo}>
+                  {solicitud.trabajoRealizado
+                    ? 'Actualizar trabajo realizado'
+                    : 'Registrar trabajo realizado'}
+                </OutlineButton>
+              )}
               {transiciones.map((t) => {
                 const isFirstPrimary = !puedeAsignar && t.destino === 'En proceso';
                 if (isFirstPrimary || (!puedeAsignar && t.destino === 'Finalizada')) {
@@ -386,13 +431,48 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
 
       {/* Main 2-column content layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-[48px]">
-        {/* Left 7 cols: Description, Closure reason, Evidences, AI Analysis */}
+        {/* Left 7 cols: Description, Work Registered, Closure reason, Evidences, AI Analysis */}
         <div className="lg:col-span-7 space-y-[48px]">
           <section className="space-y-[12px]">
             <h2 className="nav-label text-ash-gray">Descripción del problema</h2>
             <p className="body-ultralight text-bone-white whitespace-pre-line">
               {solicitud.descripcion}
             </p>
+          </section>
+
+          {/* Registro de trabajo realizado (Empleado Técnico / Administrador) */}
+          <section className="space-y-[14px] border-t border-white/12 pt-[24px]">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="nav-label text-electric-iris">
+                  Trabajo técnico realizado
+                </h2>
+                {solicitud.trabajoActualizadoEn && (
+                  <p className="text-[12px] text-ash-gray tabular-nums mt-[2px]">
+                    Última actualización: {formatearFecha(solicitud.trabajoActualizadoEn)}
+                  </p>
+                )}
+              </div>
+              {puedeRegistrar && (
+                <GhostButton onClick={handleOpenTrabajo}>
+                  {solicitud.trabajoRealizado ? 'Editar registro' : '+ Registrar trabajo'}
+                </GhostButton>
+              )}
+            </div>
+
+            {solicitud.trabajoRealizado ? (
+              <div className="border border-white/12 bg-white/[0.02] rounded-[16px] p-[18px]">
+                <p className="body-ultralight text-bone-white whitespace-pre-line">
+                  {solicitud.trabajoRealizado}
+                </p>
+              </div>
+            ) : (
+              <p className="text-[14px] text-ash-gray">
+                {isTecnico
+                  ? 'Aún no ha registrado el detalle del trabajo realizado en esta solicitud.'
+                  : 'Pendiente de registro por el área técnica.'}
+              </p>
+            )}
           </section>
 
           {solicitud.motivoCierre && (
@@ -506,7 +586,8 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
             )}
           </section>
 
-          {/* Análisis de IA (Fase 5 - M6, RC-07) */}
+          {/* Análisis de IA (Fase 5 - M6, RC-07 — solo visible para Administrador y Empleado Técnico) */}
+          {!isCliente && (
           <section className="space-y-[18px] border-t border-white/12 pt-[30px]">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -670,6 +751,7 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
               </div>
             )}
           </section>
+          )}
         </div>
 
         {/* Right 5 cols: Summary metadata & State history */}
@@ -678,18 +760,20 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
             <h2 className="nav-label text-ash-gray">Información de la solicitud</h2>
 
             <dl className="divide-y divide-white/10 text-[15px]">
-              <div className="py-[12px] flex justify-between gap-4">
-                <dt className="text-ash-gray">Solicitante</dt>
-                <dd className="text-right text-bone-white">
-                  {solicitante
-                    ? `${solicitante.nombres} ${solicitante.apellidos}${
-                        !solicitante.activo ? ' (inactivo)' : ''
-                      }`
-                    : '—'}
-                </dd>
-              </div>
+              {!isCliente && (
+                <div className="py-[12px] flex justify-between gap-4">
+                  <dt className="text-ash-gray">Solicitante</dt>
+                  <dd className="text-right text-bone-white">
+                    {solicitante
+                      ? `${solicitante.nombres} ${solicitante.apellidos}${
+                          !solicitante.activo ? ' (inactivo)' : ''
+                        }`
+                      : '—'}
+                  </dd>
+                </div>
+              )}
 
-              {registradaPorOtro && registradorEmp && (
+              {!isCliente && registradaPorOtro && registradorEmp && (
                 <div className="py-[12px] flex justify-between gap-4">
                   <dt className="text-ash-gray">Registrada por</dt>
                   <dd className="text-right text-silver-mist">
@@ -699,9 +783,15 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
               )}
 
               <div className="py-[12px] flex justify-between gap-4">
-                <dt className="text-ash-gray">Técnico asignado</dt>
+                <dt className="text-ash-gray">
+                  {isCliente ? 'Atención técnica' : 'Técnico asignado'}
+                </dt>
                 <dd className="text-right text-bone-white">
-                  {tecnicoVigente
+                  {isCliente
+                    ? asignacionVigente
+                      ? 'Personal técnico asignado'
+                      : 'Pendiente de asignación'
+                    : tecnicoVigente
                     ? `${tecnicoVigente.nombres} ${tecnicoVigente.apellidos}`
                     : 'Sin asignar'}
                 </dd>
@@ -739,10 +829,13 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
             <h2 className="nav-label text-ash-gray">Historial de estados</h2>
             <ol className="border-t border-white/12 divide-y divide-white/10">
               {solicitudHistorial.map((h) => {
-                const usr = usuarios.find((u) => u.id === h.usuarioId);
-                const emp = usr
-                  ? empleados.find((e) => e.id === usr.empleadoId)
+                const usr = !isCliente
+                  ? usuarios.find((u) => u.id === h.usuarioId)
                   : undefined;
+                const emp =
+                  !isCliente && usr
+                    ? empleados.find((e) => e.id === usr.empleadoId)
+                    : undefined;
 
                 return (
                   <li key={h.id} className="py-[14px] space-y-[4px]">
@@ -756,10 +849,12 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
                         {formatearFecha(h.cambiadoEn)}
                       </span>
                     </div>
-                    <p className="text-[13px] text-silver-mist">
-                      Por {emp ? `${emp.nombres} ${emp.apellidos}` : 'Sistema'}
-                    </p>
-                    {h.motivo && (
+                    {!isCliente && (
+                      <p className="text-[13px] text-silver-mist">
+                        Por {emp ? `${emp.nombres} ${emp.apellidos}` : 'Sistema'}
+                      </p>
+                    )}
+                    {h.motivo && !isCliente && (
                       <p className="text-[13px] text-ash-gray italic">
                         “{h.motivo}”
                       </p>
@@ -771,6 +866,52 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
           </div>
         </aside>
       </div>
+
+      {/* Diálogo Registrar o actualizar trabajo realizado (Empleado Técnico / Administrador) */}
+      <ModalDialog
+        open={modalTrabajoOpen}
+        title={
+          solicitud.trabajoRealizado
+            ? 'Actualizar trabajo realizado'
+            : 'Registrar trabajo realizado'
+        }
+        onClose={() => setModalTrabajoOpen(false)}
+      >
+        <form onSubmit={handleConfirmTrabajo} className="space-y-[18px]">
+          <p className="body-ultralight text-silver-mist">
+            Documente las acciones de diagnóstico, reparación o repuestos utilizados en la solicitud{' '}
+            <strong className="text-bone-white font-normal">{solicitud.codigo}</strong>.
+          </p>
+
+          <div>
+            <FieldLabel htmlFor="trabajo-realizado-input" required>
+              Detalle del trabajo realizado (mínimo 10 caracteres)
+            </FieldLabel>
+            <textarea
+              id="trabajo-realizado-input"
+              rows={5}
+              maxLength={1000}
+              value={textoTrabajo}
+              onChange={(e) => {
+                setTextoTrabajo(e.target.value);
+                setTrabajoError(null);
+              }}
+              placeholder="Describa la intervención técnica realizada sobre el recurso…"
+              className={inputBaseClass}
+            />
+            <FieldError message={trabajoError} />
+          </div>
+
+          <div className="flex items-center gap-[12px] pt-[6px]">
+            <PrimaryButton type="submit" disabled={savingModal}>
+              {savingModal ? 'Guardando…' : 'Guardar registro'}
+            </PrimaryButton>
+            <OutlineButton onClick={() => setModalTrabajoOpen(false)}>
+              Cancelar
+            </OutlineButton>
+          </div>
+        </form>
+      </ModalDialog>
 
       {/* P-07 Diálogo Asignar o reasignar técnico (RC-04) */}
       <ModalDialog

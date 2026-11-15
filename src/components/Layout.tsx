@@ -3,6 +3,7 @@ import { Menu, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { LogoLockup } from './ConstellationCanvas';
 import { GhostButton, ModalDialog, OutlineButton, PrimaryButton } from './CommonUI';
+import { ETIQUETA_PERFIL, puedeCrearSolicitud } from '../services/domainRules';
 
 interface NavLinkItem {
   label: string;
@@ -17,6 +18,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     currentUser,
     currentEmpleado,
     isAdmin,
+    isTecnico,
     logout,
     toasts,
     dismissToast,
@@ -30,20 +32,33 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     ? [
         { label: 'Inicio', path: '/' },
         { label: 'Solicitudes', path: '/solicitudes', matchPrefix: true },
-        { label: 'Empleados', path: '/admin/empleados', matchPrefix: true },
         { label: 'Usuarios', path: '/admin/usuarios' },
+        { label: 'Empleados', path: '/admin/empleados', matchPrefix: true },
         { label: 'Recursos', path: '/admin/recursos', matchPrefix: true },
         { label: 'Categorías', path: '/admin/categorias' },
       ]
+    : isTecnico
+    ? [
+        { label: 'Inicio', path: '/' },
+        { label: 'Mis Asignaciones', path: '/tecnico/solicitudes', matchPrefix: true },
+      ]
     : [
         { label: 'Inicio', path: '/' },
-        { label: 'Solicitudes', path: '/solicitudes', matchPrefix: true },
+        { label: 'Mis Solicitudes', path: '/solicitudes', matchPrefix: true },
       ];
+
+  const mostrarBotonNuevaSolicitud =
+    puedeCrearSolicitud(currentUser) && pathname !== '/solicitudes/nueva';
 
   const isLinkActive = (item: NavLinkItem) => {
     if (item.path === '/') return pathname === '/';
-    if (item.path === '/solicitudes') {
-      return pathname === '/solicitudes' || (pathname.startsWith('/solicitudes/') && pathname !== '/solicitudes/nueva');
+    if (item.path === '/solicitudes' || item.path === '/tecnico/solicitudes') {
+      return (
+        pathname === '/solicitudes' ||
+        pathname === '/tecnico' ||
+        pathname === '/tecnico/solicitudes' ||
+        (pathname.startsWith('/solicitudes/') && pathname !== '/solicitudes/nueva')
+      );
     }
     return item.matchPrefix ? pathname.startsWith(item.path) : pathname === item.path;
   };
@@ -89,13 +104,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="text-silver-mist whitespace-nowrap">
                   {currentEmpleado.nombres} {currentEmpleado.apellidos}
                 </span>
+                <span className="px-[10px] py-[2px] rounded-full border border-white/15 text-[11px] uppercase tracking-[0.35px] text-saffron-spark">
+                  {ETIQUETA_PERFIL[currentUser.perfil]}
+                </span>
                 <span aria-hidden="true" className="text-ash-gray">·</span>
                 <GhostButton onClick={() => logout('Sesión cerrada')}>
                   Cerrar sesión
                 </GhostButton>
               </div>
 
-              {pathname !== '/solicitudes/nueva' && (
+              {mostrarBotonNuevaSolicitud && (
                 <PrimaryButton
                   onClick={() => handleNavClick('/solicitudes/nueva')}
                   className="hidden sm:inline-flex"
@@ -121,7 +139,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="lg:hidden border-t border-white/12 px-[18px] py-[24px] space-y-[18px] bg-void">
               <div className="flex items-center justify-between text-[14px] pb-[12px] border-b border-white/10">
                 <span className="text-silver-mist">
-                  {currentEmpleado.nombres} {currentEmpleado.apellidos} ({isAdmin ? 'Administrador' : currentEmpleado.esTecnico ? 'Empleado Técnico' : 'Empleado'})
+                  {currentEmpleado.nombres} {currentEmpleado.apellidos} ({ETIQUETA_PERFIL[currentUser.perfil]})
                 </span>
                 <GhostButton onClick={() => logout('Sesión cerrada')}>
                   Cerrar sesión
@@ -141,7 +159,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   </button>
                 ))}
               </nav>
-              {pathname !== '/solicitudes/nueva' && (
+              {mostrarBotonNuevaSolicitud && (
                 <div className="pt-[6px]">
                   <PrimaryButton
                     onClick={() => handleNavClick('/solicitudes/nueva')}
@@ -201,13 +219,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <footer className="w-full border-t border-white/10 py-[24px]">
           <div className="max-w-[1280px] mx-auto px-[18px] sm:px-[30px] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-[12px] text-[12px] text-ash-gray">
             <span>Plataforma de Solicitudes de Mantenimiento</span>
-            <span>
-              {isAdmin
-                ? 'Perfil: Administrador'
-                : currentEmpleado?.esTecnico
-                ? 'Perfil: Empleado · Función técnica'
-                : 'Perfil: Empleado'}
-            </span>
+            <span>Rol: {ETIQUETA_PERFIL[currentUser.perfil]}</span>
           </div>
         </footer>
       )}

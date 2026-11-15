@@ -14,8 +14,10 @@ import {
   formatearTamano,
   MAX_FOTOS,
   MAX_PDFS,
+  puedeCrearSolicitud,
   validarArchivoEvidencia,
 } from '../services/domainRules';
+import { ErrorScreen } from './ErrorScreen';
 import { FileText, Upload, X } from 'lucide-react';
 
 interface PendingFile {
@@ -29,6 +31,7 @@ interface PendingFile {
 
 export function NewRequestScreen() {
   const {
+    currentUser,
     isAdmin,
     currentEmpleado,
     empleados,
@@ -39,6 +42,10 @@ export function NewRequestScreen() {
   } = useApp();
 
   const submissionTokenRef = useRef<string>(`sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+  if (!puedeCrearSolicitud(currentUser)) {
+    return <ErrorScreen tipo="sin-permiso" />;
+  }
 
   const [solicitanteQuery, setSolicitanteQuery] = useState('');
   const [solicitanteId, setSolicitanteId] = useState<number>(currentEmpleado?.id ?? 0);

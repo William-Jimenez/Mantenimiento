@@ -18,6 +18,7 @@ import {
 } from './screens/ResourcesScreens';
 import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ErrorScreen } from './screens/ErrorScreen';
+import { tienePermisoRuta } from './services/domainRules';
 
 function RouterView() {
   const { pathname, currentUser } = useApp();
@@ -32,15 +33,23 @@ function RouterView() {
     return <ChangePasswordScreen />;
   }
 
-  // Authenticated routes inside AppLayout
+  // Authenticated routes inside AppLayout with central RBAC guard
   const renderScreen = () => {
+    if (pathname === '/error') {
+      return <ErrorScreen tipo="sin-permiso" />;
+    }
+
+    if (!tienePermisoRuta(currentUser, pathname)) {
+      return <ErrorScreen tipo="sin-permiso" />;
+    }
+
     if (pathname === '/' || pathname === '') {
       return <DashboardScreen />; // P-03
     }
     if (pathname === '/solicitudes/nueva') {
       return <NewRequestScreen />; // P-04
     }
-    if (pathname === '/solicitudes') {
+    if (pathname === '/solicitudes' || pathname === '/tecnico' || pathname === '/tecnico/solicitudes') {
       return <RequestsListScreen />; // P-05
     }
     const solMatch = pathname.match(/^\/solicitudes\/(\d+)$/);
@@ -76,10 +85,6 @@ function RouterView() {
 
     if (pathname === '/admin/categorias') {
       return <CategoriesScreen />; // P-15
-    }
-
-    if (pathname === '/error') {
-      return <ErrorScreen tipo="sin-permiso" />; // P-16
     }
 
     return <ErrorScreen tipo="no-encontrado" />; // P-16

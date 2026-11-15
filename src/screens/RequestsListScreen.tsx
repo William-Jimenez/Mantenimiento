@@ -17,6 +17,7 @@ export function RequestsListScreen() {
   const {
     isAdmin,
     isTecnico,
+    isCliente,
     currentEmpleado,
     empleados,
     recursos,
@@ -109,22 +110,30 @@ export function RequestsListScreen() {
     <section className="space-y-[36px]">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-[24px]">
         <div className="space-y-[12px]">
-          <p className="nav-label text-saffron-spark">M3 · M5 Seguimiento</p>
+          <p className="nav-label text-saffron-spark">
+            {isAdmin
+              ? 'M3 · M5 Seguimiento Global'
+              : isTecnico
+              ? 'Bandeja Técnica · Reparaciones Asignadas'
+              : 'Portal de Cliente · Mis Solicitudes'}
+          </p>
           <h1 className="text-[42px] sm:text-[56px] leading-[1.08] tracking-[-1.68px] text-bone-white">
-            Solicitudes
+            {isTecnico ? 'Solicitudes asignadas' : isCliente ? 'Mis solicitudes' : 'Solicitudes'}
           </h1>
           <p className="body-ultralight text-silver-mist">
             {isAdmin
-              ? 'Consulte y filtre todas las solicitudes registradas en la plataforma.'
+              ? 'Consulte, asigne técnicos y filtre todas las solicitudes registradas en la plataforma.'
               : isTecnico
-              ? 'Consulte sus solicitudes propias y las que tiene asignadas como técnico.'
-              : 'Consulte el estado y detalle de sus solicitudes registradas.'}
+              ? 'Consulte únicamente las solicitudes asignadas a su cargo, actualice su estado y registre el trabajo realizado.'
+              : 'Consulte el estado y avance de sus propias solicitudes de mantenimiento.'}
           </p>
         </div>
 
-        <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
-          Nueva solicitud
-        </PrimaryButton>
+        {!isTecnico && (
+          <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
+            Nueva solicitud
+          </PrimaryButton>
+        )}
       </div>
 
       {/* Multi-state filter bar (HU-09) */}
@@ -263,21 +272,25 @@ export function RequestsListScreen() {
           title={
             hayFiltros && filtrosSolicitudes.estados.length > 0
               ? `No hay solicitudes en estado ${filtrosSolicitudes.estados.join(', ')}`
+              : isTecnico
+              ? 'No tiene solicitudes asignadas'
               : 'No hay solicitudes'
           }
           description={
             hayFiltros
               ? 'Pruebe cambiando o quitando los filtros seleccionados.'
+              : isTecnico
+              ? 'Cuando el Administrador le asigne una solicitud para reparación, aparecerá en esta bandeja.'
               : 'Registre una nueva solicitud de mantenimiento para comenzar.'
           }
           action={
             hayFiltros ? (
               <OutlineButton onClick={limpiarFiltros}>Quitar filtro</OutlineButton>
-            ) : (
+            ) : !isTecnico ? (
               <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
                 Nueva solicitud
               </PrimaryButton>
-            )
+            ) : undefined
           }
         />
       ) : (
@@ -289,21 +302,31 @@ export function RequestsListScreen() {
                   <th className="py-[12px] pr-[18px] font-semibold">Código</th>
                   <th className="py-[12px] pr-[18px] font-semibold">Recurso</th>
                   <th className="py-[12px] pr-[18px] font-semibold">Estado</th>
-                  <th className="py-[12px] pr-[18px] font-semibold">Solicitante</th>
-                  <th className="py-[12px] pr-[18px] font-semibold">Técnico</th>
+                  {isAdmin && (
+                    <>
+                      <th className="py-[12px] pr-[18px] font-semibold">Solicitante</th>
+                      <th className="py-[12px] pr-[18px] font-semibold">Técnico</th>
+                    </>
+                  )}
+                  {!isAdmin && (
+                    <th className="py-[12px] pr-[18px] font-semibold">Trabajo realizado</th>
+                  )}
                   <th className="py-[12px] text-right font-semibold">Fecha</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/10 text-[15px]">
                 {paginaItems.map((sol) => {
                   const rec = recursos.find((r) => r.id === sol.recursoId);
-                  const solEmp = empleados.find((e) => e.id === sol.solicitanteId);
-                  const asig = asignaciones.find(
-                    (a) => a.vigente && a.solicitudId === sol.id
-                  );
-                  const tecEmp = asig
-                    ? empleados.find((e) => e.id === asig.tecnicoId)
+                  const solEmp = isAdmin
+                    ? empleados.find((e) => e.id === sol.solicitanteId)
                     : undefined;
+                  const asig = isAdmin
+                    ? asignaciones.find((a) => a.vigente && a.solicitudId === sol.id)
+                    : undefined;
+                  const tecEmp =
+                    isAdmin && asig
+                      ? empleados.find((e) => e.id === asig.tecnicoId)
+                      : undefined;
 
                   return (
                     <tr
@@ -333,16 +356,24 @@ export function RequestsListScreen() {
                       <td className="py-[16px] pr-[18px]">
                         <EstadoLabel estado={sol.estado} />
                       </td>
-                      <td className="py-[16px] pr-[18px] text-silver-mist text-[14px]">
-                        {solEmp
-                          ? `${solEmp.nombres} ${solEmp.apellidos}${
-                              !solEmp.activo ? ' (inactivo)' : ''
-                            }`
-                          : '—'}
-                      </td>
-                      <td className="py-[16px] pr-[18px] text-silver-mist text-[14px]">
-                        {tecEmp ? `${tecEmp.nombres} ${tecEmp.apellidos}` : 'Sin asignar'}
-                      </td>
+                      {isAdmin ? (
+                        <>
+                          <td className="py-[16px] pr-[18px] text-silver-mist text-[14px]">
+                            {solEmp
+                              ? `${solEmp.nombres} ${solEmp.apellidos}${
+                                  !solEmp.activo ? ' (inactivo)' : ''
+                                }`
+                              : '—'}
+                          </td>
+                          <td className="py-[16px] pr-[18px] text-silver-mist text-[14px]">
+                            {tecEmp ? `${tecEmp.nombres} ${tecEmp.apellidos}` : 'Sin asignar'}
+                          </td>
+                        </>
+                      ) : (
+                        <td className="py-[16px] pr-[18px] text-silver-mist text-[14px] max-w-[320px] truncate">
+                          {sol.trabajoRealizado || sol.motivoCierre || 'Pendiente de registro técnico'}
+                        </td>
+                      )}
                       <td className="py-[16px] text-right tabular-nums text-[14px] text-ash-gray whitespace-nowrap">
                         {formatearFecha(sol.creadaEn)}
                       </td>

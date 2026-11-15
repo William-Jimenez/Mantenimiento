@@ -33,15 +33,19 @@ import {
 } from '../data/seed';
 import {
   esEstadoFinal,
+  ETIQUETA_PERFIL,
   generarCodigoSolicitud,
   obtenerTransicionesPermitidas,
   puedeAdjuntarEvidencia,
   puedeAsignarTecnico,
+  puedeCrearSolicitud,
+  puedeGestionarUsuarios,
+  puedeRegistrarTrabajo,
   puedeVerSolicitud,
   validarPoliticaPassword,
 } from '../services/domainRules';
 
-const STORAGE_KEY = 'plataforma_mantenimiento_v1';
+const STORAGE_KEY = 'plataforma_mantenimiento_v2';
 const INACTIVITY_WARNING_MS = 28 * 60 * 1000;
 const INACTIVITY_EXPIRE_MS = 30 * 60 * 1000;
 
@@ -109,6 +113,7 @@ interface AppContextValue {
   currentEmpleado: Empleado | null;
   isAdmin: boolean;
   isTecnico: boolean;
+  isCliente: boolean;
   loginNotice: string | null;
   clearLoginNotice: () => void;
   sessionExpiringSoon: boolean;
@@ -155,7 +160,28 @@ interface AppContextValue {
     }
   ) => ActionResult<Empleado>;
   toggleTecnicoEmpleado: (empleadoId: number) => ActionResult<{ solicitudesActivas?: Solicitud[] }>;
-  crearUsuario: (empleadoId: number, perfil: PerfilUsuario) => ActionResult<{ passwordTemporal: string }>;
+  crearUsuario: (
+    empleadoId: number,
+    perfil: PerfilUsuario,
+    nuevoRegistro?: {
+      documento: string;
+      nombres: string;
+      apellidos: string;
+      correo: string;
+      cargo: string;
+    }
+  ) => ActionResult<{ passwordTemporal: string }>;
+  editarUsuario: (
+    usuarioId: number,
+    data: {
+      nombres: string;
+      apellidos: string;
+      correo: string;
+      cargo: string;
+      perfil: PerfilUsuario;
+      activo: boolean;
+    }
+  ) => ActionResult;
   toggleUsuarioActivo: (usuarioId: number) => ActionResult;
   cambiarPerfilUsuario: (usuarioId: number, perfil: PerfilUsuario) => ActionResult;
   restablecerPasswordUsuario: (usuarioId: number) => ActionResult<{ passwordTemporal: string }>;
@@ -202,6 +228,11 @@ interface AppContextValue {
     }>
   ) => ActionResult;
   asignarTecnico: (solicitudId: number, tecnicoId: number, expectedVersion: number) => ActionResult;
+  registrarTrabajoRealizado: (
+    solicitudId: number,
+    trabajoRealizado: string,
+    expectedVersion: number
+  ) => ActionResult;
   cambiarEstadoSolicitud: (
     solicitudId: number,
     destino: EstadoNombre,
@@ -491,7 +522,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     (correo: string, password: string): LoginResult => {
-      const normalized = correo.trim().toLowerCase();
+      const rawNormalized = correo.trim().toLowerCase();
+      const normalized =
+        rawNormalized === 'empleado@empresa.com' ? 'cliente@empresa.com' : rawNormalized;
       const empleado = state.empleados.find((e) => e.correo.toLowerCase() === normalized);
       const usuario = empleado
         ? state.usuarios.find((u) => u.empleadoId === empleado.id)
@@ -789,22 +822,103 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [currentUser, state.empleados, state.asignaciones, state.solicitudes, pushToast]
   );
 
-  const crearUsuario = useCallback(
-    (empleadoId: number, perfil: PerfilUsuario): ActionResult<{ passwordTemporal: string }> => {
-      if (!currentUser || currentUser.perfil !== 'ADMINISTRADOR') {
-        return { ok: false, codigo: 'ACCESO_DENEGADO', error: 'Acceso denegado.' };
+  const crearUsuario: AppContextValue['crearUsuario'] = useCallback(
+    (empleadoId, perfil, nuevoRegistro): ActionResult<{ passwordTemporal: string }> => {
+      if (!puedeGestionarUsuarios(currentUser)) {
+        return { ok: false, codigo: 'ACCESO_DENEGADO', error: 'Acceso denegado: solo el Administrador puede gestionar usuarios.' };
       }
-      const emp = state.empleados.find((e) => e.id === empleadoId);
-      if (!emp) return { ok: false, error: 'Empleado no encontrado.' };
-      if (state.usuarios.some((u) => u.empleadoId === empleadoId)) {
-        return { ok: false, codigo: 'DUPLICADO', error: 'Este empleado ya tiene un usuario asociado.' };
+
+      const now = new Date().toISOString();
+      let targetEmpId = empleadoId;
+      let nombreCompleto = '';
+
+      if (nuevoRegistro) {
+        const docClean = nuevoRegistro.documento.trim();
+        const nombresClean = nuevoRegistro.nombres.trim();
+        const apellidosClean = nuevoRegistro.apellidos.trim();
+        const correoClean = nuevoRegistro.correo.trim().toLowerCase();
+        const cargoClean =
+          nuevoRegistro.cargo.trim() ||
+          (perfil === 'CLIENTE'
+            ? 'Cliente'
+            : perfil === 'EMPLEADO'
+            ? 'Técnico de Mantenimiento'
+            : 'Administrador');
+
+        if (!docClean || !nombresClean || !apellidosClean || !correoClean) {
+          return {
+            ok: false,
+            codigo: 'VALIDACION',
+            error: 'Complete documento, nombres, apellidos y correo electrónico.',
+          };
+        }
+
+        if (state.empleados.some((e) => e.documento.toLowerCase() === docClean.toLowerCase())) {
+          return {
+            ok: false,
+            codigo: 'DUPLICADO',
+            error: 'Ya existe un registro con ese documento de identidad.',
+          };
+        }
+
+        if (state.empleados.some((e) => e.correo.toLowerCase() === correoClean)) {
+          return {
+            ok: false,
+            codigo: 'DUPLICADO',
+            error: 'Ya existe un usuario o registro con ese correo electrónico.',
+          };
+        }
+
+        targetEmpId = Math.max(0, ...state.empleados.map((e) => e.id)) + 1;
+        nombreCompleto = `${nombresClean} ${apellidosClean}`;
+        const nuevoEmp: Empleado = {
+          id: targetEmpId,
+          documento: docClean,
+          nombres: nombresClean,
+          apellidos: apellidosClean,
+          correo: correoClean,
+          cargo: cargoClean,
+          esTecnico: perfil === 'EMPLEADO',
+          activo: true,
+          creadoEn: now,
+          actualizadoEn: now,
+        };
+
+        const passwordTemporal = `Temp${Math.floor(100000 + Math.random() * 899999)}a`;
+        const nextId = Math.max(0, ...state.usuarios.map((u) => u.id)) + 1;
+        const nuevo: Usuario = {
+          id: nextId,
+          empleadoId: targetEmpId,
+          perfil,
+          password: passwordTemporal,
+          debeCambiarPassword: true,
+          intentosFallidos: 0,
+          bloqueadoHasta: null,
+          ultimoAcceso: null,
+          activo: true,
+          creadoEn: now,
+        };
+
+        setState((prev) => ({
+          ...prev,
+          empleados: [...prev.empleados, nuevoEmp],
+          usuarios: [...prev.usuarios, nuevo],
+        }));
+        pushToast('exito', `Usuario (${ETIQUETA_PERFIL[perfil]}) creado para ${nombreCompleto}.`);
+        return { ok: true, data: { passwordTemporal } };
+      }
+
+      const emp = state.empleados.find((e) => e.id === targetEmpId);
+      if (!emp) return { ok: false, error: 'Persona no encontrada.' };
+      if (state.usuarios.some((u) => u.empleadoId === targetEmpId)) {
+        return { ok: false, codigo: 'DUPLICADO', error: 'Este registro ya tiene un usuario asociado.' };
       }
 
       const passwordTemporal = `Temp${Math.floor(100000 + Math.random() * 899999)}a`;
       const nextId = Math.max(0, ...state.usuarios.map((u) => u.id)) + 1;
       const nuevo: Usuario = {
         id: nextId,
-        empleadoId,
+        empleadoId: targetEmpId,
         perfil,
         password: passwordTemporal,
         debeCambiarPassword: true,
@@ -812,13 +926,104 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         bloqueadoHasta: null,
         ultimoAcceso: null,
         activo: true,
-        creadoEn: new Date().toISOString(),
+        creadoEn: now,
       };
-      setState((prev) => ({ ...prev, usuarios: [...prev.usuarios, nuevo] }));
-      pushToast('exito', `Usuario creado para ${emp.nombres} ${emp.apellidos}.`);
+      setState((prev) => ({
+        ...prev,
+        empleados: prev.empleados.map((e) =>
+          e.id === targetEmpId
+            ? { ...e, esTecnico: perfil === 'EMPLEADO', actualizadoEn: now }
+            : e
+        ),
+        usuarios: [...prev.usuarios, nuevo],
+      }));
+      pushToast('exito', `Usuario (${ETIQUETA_PERFIL[perfil]}) creado para ${emp.nombres} ${emp.apellidos}.`);
       return { ok: true, data: { passwordTemporal } };
     },
     [currentUser, state.empleados, state.usuarios, pushToast]
+  );
+
+  const editarUsuario: AppContextValue['editarUsuario'] = useCallback(
+    (usuarioId, data) => {
+      if (!puedeGestionarUsuarios(currentUser)) {
+        return {
+          ok: false,
+          codigo: 'ACCESO_DENEGADO',
+          error: 'Acceso denegado: solo el Administrador puede editar usuarios.',
+        };
+      }
+      const usr = state.usuarios.find((u) => u.id === usuarioId);
+      if (!usr) return { ok: false, error: 'Usuario no encontrado.' };
+
+      const nombresClean = data.nombres.trim();
+      const apellidosClean = data.apellidos.trim();
+      const correoClean = data.correo.trim().toLowerCase();
+      const cargoClean = data.cargo.trim();
+
+      if (!nombresClean || !apellidosClean || !correoClean) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          error: 'Nombres, apellidos y correo electrónico son obligatorios.',
+        };
+      }
+
+      const dupCorreo = state.empleados.find(
+        (e) => e.correo.toLowerCase() === correoClean && e.id !== usr.empleadoId
+      );
+      if (dupCorreo) {
+        return {
+          ok: false,
+          codigo: 'DUPLICADO',
+          error: 'Ya existe otro usuario con este correo electrónico.',
+        };
+      }
+
+      if (
+        usr.perfil === 'ADMINISTRADOR' &&
+        (data.perfil !== 'ADMINISTRADOR' || !data.activo) &&
+        usr.activo
+      ) {
+        const adminsActivos = state.usuarios.filter(
+          (u) => u.activo && u.perfil === 'ADMINISTRADOR'
+        );
+        if (adminsActivos.length <= 1) {
+          return {
+            ok: false,
+            codigo: 'REGLA_NEGOCIO',
+            error: 'No se puede desactivar ni degradar al último Administrador activo.',
+          };
+        }
+      }
+
+      const now = new Date().toISOString();
+      setState((prev) => ({
+        ...prev,
+        usuarios: prev.usuarios.map((u) =>
+          u.id === usuarioId
+            ? { ...u, perfil: data.perfil, activo: data.activo }
+            : u
+        ),
+        empleados: prev.empleados.map((e) =>
+          e.id === usr.empleadoId
+            ? {
+                ...e,
+                nombres: nombresClean,
+                apellidos: apellidosClean,
+                correo: correoClean,
+                cargo: cargoClean || e.cargo,
+                esTecnico: data.perfil === 'EMPLEADO',
+                activo: data.activo,
+                actualizadoEn: now,
+              }
+            : e
+        ),
+      }));
+
+      pushToast('exito', 'Datos y rol del usuario actualizados.');
+      return { ok: true };
+    },
+    [currentUser, state.usuarios, state.empleados, pushToast]
   );
 
   const toggleUsuarioActivo = useCallback(
@@ -856,13 +1061,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const cambiarPerfilUsuario = useCallback(
     (usuarioId: number, perfil: PerfilUsuario): ActionResult => {
-      if (!currentUser || currentUser.perfil !== 'ADMINISTRADOR') {
+      if (!puedeGestionarUsuarios(currentUser)) {
         return { ok: false, codigo: 'ACCESO_DENEGADO', error: 'Acceso denegado.' };
       }
       const usr = state.usuarios.find((u) => u.id === usuarioId);
       if (!usr) return { ok: false, error: 'Usuario no encontrado.' };
 
-      if (usr.perfil === 'ADMINISTRADOR' && perfil === 'EMPLEADO' && usr.activo) {
+      if (usr.perfil === 'ADMINISTRADOR' && perfil !== 'ADMINISTRADOR' && usr.activo) {
         const adminsActivos = state.usuarios.filter(
           (u) => u.activo && u.perfil === 'ADMINISTRADOR'
         );
@@ -878,8 +1083,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setState((prev) => ({
         ...prev,
         usuarios: prev.usuarios.map((u) => (u.id === usuarioId ? { ...u, perfil } : u)),
+        empleados: prev.empleados.map((e) =>
+          e.id === usr.empleadoId
+            ? { ...e, esTecnico: perfil === 'EMPLEADO', actualizadoEn: new Date().toISOString() }
+            : e
+        ),
       }));
-      pushToast('exito', `Perfil actualizado a ${perfil}.`);
+      pushToast('exito', `Rol actualizado a ${ETIQUETA_PERFIL[perfil]}.`);
       return { ok: true };
     },
     [currentUser, state.usuarios, pushToast]
@@ -1058,8 +1268,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const crearSolicitud: AppContextValue['crearSolicitud'] = useCallback(
     (input) => {
-      if (!currentUser || !currentEmpleado) {
-        return { ok: false, codigo: 'ACCESO_DENEGADO', error: 'Sesión no válida.' };
+      if (!currentUser || !currentEmpleado || !puedeCrearSolicitud(currentUser)) {
+        return {
+          ok: false,
+          codigo: 'ACCESO_DENEGADO',
+          error: 'Su rol no tiene permiso para crear solicitudes de mantenimiento.',
+        };
       }
 
       // Idempotency token check (RC-02)
@@ -1215,7 +1429,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       const sol = state.solicitudes.find((s) => s.id === solicitudId);
       if (!sol) return { ok: false, error: 'Solicitud no encontrada.' };
-      if (!puedeAdjuntarEvidencia(currentUser, currentEmpleado, sol)) {
+      const asigVigente = state.asignaciones.find(
+        (a) => a.solicitudId === solicitudId && a.vigente
+      );
+      if (!puedeAdjuntarEvidencia(currentUser, currentEmpleado, sol, asigVigente)) {
         return {
           ok: false,
           codigo: 'ACCESO_DENEGADO',
@@ -1259,7 +1476,86 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pushToast('exito', `${nuevas.length} evidencia(s) adjuntada(s).`);
       return { ok: true };
     },
-    [currentUser, currentEmpleado, state.solicitudes, state.evidencias, pushToast]
+    [currentUser, currentEmpleado, state.solicitudes, state.asignaciones, state.evidencias, pushToast]
+  );
+
+  const registrarTrabajoRealizado = useCallback(
+    (solicitudId: number, trabajoRealizado: string, expectedVersion: number): ActionResult => {
+      if (!currentUser || !currentEmpleado) {
+        return { ok: false, codigo: 'ACCESO_DENEGADO', error: 'Sesión no válida.' };
+      }
+      const sol = state.solicitudes.find((s) => s.id === solicitudId);
+      if (!sol) return { ok: false, error: 'Solicitud no encontrada.' };
+
+      if (sol.version !== expectedVersion) {
+        return {
+          ok: false,
+          codigo: 'CONFLICTO_VERSION',
+          error: 'La solicitud cambió mientras la editaba.',
+        };
+      }
+
+      const asigVigente = state.asignaciones.find(
+        (a) => a.solicitudId === solicitudId && a.vigente
+      );
+      if (!puedeRegistrarTrabajo(currentUser, currentEmpleado, sol, asigVigente)) {
+        return {
+          ok: false,
+          codigo: 'ACCESO_DENEGADO',
+          error: 'No tiene permiso para registrar trabajo realizado en esta solicitud.',
+        };
+      }
+
+      const textoClean = trabajoRealizado.trim();
+      if (textoClean.length < 10) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'trabajoRealizado',
+          error: 'Detalle el trabajo realizado (mínimo 10 caracteres).',
+        };
+      }
+      if (textoClean.length > 1000) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'trabajoRealizado',
+          error: 'El registro de trabajo no puede superar los 1 000 caracteres.',
+        };
+      }
+
+      const now = new Date().toISOString();
+      const nextHistId = Math.max(0, ...state.historial.map((h) => h.id)) + 1;
+      const hist: HistorialEstado = {
+        id: nextHistId,
+        solicitudId,
+        estadoAnterior: sol.estado,
+        estadoNuevo: sol.estado,
+        usuarioId: currentUser.id,
+        cambiadoEn: now,
+        motivo: `Trabajo registrado: ${textoClean}`,
+      };
+
+      setState((prev) => ({
+        ...prev,
+        solicitudes: prev.solicitudes.map((s) =>
+          s.id === solicitudId
+            ? {
+                ...s,
+                trabajoRealizado: textoClean,
+                trabajoActualizadoEn: now,
+                actualizadaEn: now,
+                version: s.version + 1,
+              }
+            : s
+        ),
+        historial: [...prev.historial, hist],
+      }));
+
+      pushToast('exito', 'Trabajo realizado registrado correctamente.');
+      return { ok: true };
+    },
+    [currentUser, currentEmpleado, state.solicitudes, state.asignaciones, state.historial, pushToast]
   );
 
   const asignarTecnico = useCallback(
@@ -1415,7 +1711,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ? {
                 ...s,
                 estado: destino,
-                motivoCierre: cierra ? motivoClean || s.motivoCierre : s.motivoCierre,
+                trabajoRealizado:
+                  destino === 'Finalizada' && motivoClean
+                    ? motivoClean
+                    : s.trabajoRealizado ?? null,
+                trabajoActualizadoEn:
+                  destino === 'Finalizada' && motivoClean
+                    ? now
+                    : s.trabajoActualizadoEn ?? null,
+                motivoCierre: cierra
+                  ? motivoClean || s.trabajoRealizado || s.motivoCierre
+                  : s.motivoCierre,
                 actualizadaEn: now,
                 cerradaEn: cierra ? now : s.cerradaEn,
                 version: s.version + 1,
@@ -1596,13 +1902,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     navigate('/login', { replace: true });
   }, [navigate]);
 
+  const isAdmin = currentUser?.perfil === 'ADMINISTRADOR';
+  const isTecnico = currentUser?.perfil === 'EMPLEADO';
+  const isCliente = currentUser?.perfil === 'CLIENTE';
+
+  const empleadosVisibles = useMemo(() => {
+    if (!currentUser || !currentEmpleado) return [];
+    if (isAdmin) return state.empleados;
+    // Clientes y Empleados no acceden al directorio administrativo de otros clientes/empleados
+    return [currentEmpleado];
+  }, [currentUser, currentEmpleado, isAdmin, state.empleados]);
+
+  const usuariosVisibles = useMemo(() => {
+    if (!currentUser || !isAdmin) return [];
+    return state.usuarios;
+  }, [currentUser, isAdmin, state.usuarios]);
+
+  const solicitudesAccesibles = useMemo(() => {
+    if (!currentUser || !currentEmpleado) return [];
+    return state.solicitudes.filter((sol) => {
+      const asig = state.asignaciones.find((a) => a.solicitudId === sol.id && a.vigente);
+      return puedeVerSolicitud(currentUser, currentEmpleado, sol, asig);
+    });
+  }, [currentUser, currentEmpleado, state.solicitudes, state.asignaciones]);
+
   const value: AppContextValue = {
     pathname,
     navigate,
     currentUser,
     currentEmpleado,
-    isAdmin: currentUser?.perfil === 'ADMINISTRADOR',
-    isTecnico: !!currentEmpleado?.esTecnico,
+    isAdmin,
+    isTecnico,
+    isCliente,
     loginNotice,
     clearLoginNotice: () => setLoginNotice(null),
     sessionExpiringSoon,
@@ -1610,16 +1941,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toasts,
     pushToast,
     dismissToast,
-    empleados: state.empleados,
-    usuarios: state.usuarios,
+    empleados: empleadosVisibles,
+    usuarios: usuariosVisibles,
     tiposRecurso: state.tiposRecurso,
     recursos: state.recursos,
     categorias: state.categorias,
     prioridades: state.prioridades,
-    solicitudes: state.solicitudes,
+    solicitudes: solicitudesAccesibles,
     evidencias: state.evidencias,
     asignaciones: state.asignaciones,
-    analisisIa: state.analisisIa,
+    analisisIa: isAdmin ? state.analisisIa : [],
     historial: state.historial,
     iaHabilitada: state.iaHabilitada,
     setIaHabilitada,
@@ -1631,6 +1962,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     guardarEmpleado,
     toggleTecnicoEmpleado,
     crearUsuario,
+    editarUsuario,
     toggleUsuarioActivo,
     cambiarPerfilUsuario,
     restablecerPasswordUsuario,
@@ -1642,6 +1974,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     crearSolicitud,
     agregarEvidencias,
     asignarTecnico,
+    registrarTrabajoRealizado,
     cambiarEstadoSolicitud,
     solicitarNuevoAnalisisIa,
     revisarAnalisisIa,
