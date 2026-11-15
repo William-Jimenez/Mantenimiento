@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, describe, it } from 'node:test';
 import { SEED_ASIGNACIONES, SEED_EMPLEADOS, SEED_SOLICITUDES, SEED_USUARIOS } from '../src/data/seed';
-import { createApiApp, encodeSessionToken } from '../src/server/apiApp';
+import { createApiApp, createInitialBackendStore, encodeSessionToken } from '../src/server/apiApp';
 import {
+  esPasswordHasheada,
+  hashPassword,
   obtenerTransicionesPermitidas,
   puedeAccederRutaEmpleado,
   puedeAsignarTecnico,
@@ -12,6 +14,7 @@ import {
   puedeRegistrarTrabajo,
   puedeVerSolicitud,
   tienePermisoRuta,
+  verifyPassword,
 } from '../src/services/domainRules';
 
 describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cliente', () => {
@@ -27,6 +30,7 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
   const clienteUser = SEED_USUARIOS.find((u) => u.id === 4 && u.perfil === 'CLIENTE')!;
   const clienteEmp = SEED_EMPLEADOS.find((e) => e.id === clienteUser.empleadoId)!;
 
+  const store = createInitialBackendStore();
   let server: http.Server;
   let baseUrl = '';
 
@@ -35,7 +39,7 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
   const tokenCliente = encodeSessionToken(clienteUser.id, clienteUser.perfil);
 
   before(async () => {
-    const app = createApiApp();
+    const app = createApiApp(store);
     server = http.createServer(app);
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', () => resolve());
@@ -355,5 +359,160 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
     });
     assert.equal(resAdminCrearUsuario.status, 201);
     assert.equal(resAdminCrearUsuario.body.data.perfil, 'CLIENTE');
+  });
+
+  // ==========================================================================
+  // 3. Pruebas Automatizadas del Flujo de Registro de Usuarios (Self-Registration)
+  // ==========================================================================
+  it('permite el registro exitoso de un nuevo usuario (201), almacena la contraseña con hash criptográfico e inicia sesión automáticamente', async () => {
+    const plainPassword = 'RegistroSeguro2026';
+    const resRegistro = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        nombres: 'Valeria',
+        apellidos: 'Cárdenas Ruiz',
+        documento: '1099887766',
+        correo: 'valeria.cardenas@empresa.com',
+        password: plainPassword,
+      },
+    });
+
+    assert.equal(resRegistro.status, 201);
+    assert.equal(resRegistro.body.ok, true);
+    assert.equal(typeof resRegistro.body.token, 'string');
+    assert.equal(resRegistro.body.debeCambiarPassword, false);
+    assert.equal(resRegistro.body.usuario.correo, 'valeria.cardenas@empresa.com');
+    assert.equal(resRegistro.body.usuario.perfil, 'CLIENTE');
+    assert.equal('password' in resRegistro.body.usuario, false);
+
+    // Verificar en el almacén que la contraseña nunca se guarda en texto plano sino hasheada
+    const usuarioGuardado = store.usuarios.find((u) => u.id === resRegistro.body.usuario.id);
+    assert.ok(usuarioGuardado);
+    assert.notEqual(usuarioGuardado.password, plainPassword);
+    assert.equal(esPasswordHasheada(usuarioGuardado.password), true);
+    assert.equal(verifyPassword(plainPassword, usuarioGuardado.password), true);
+    assert.equal(verifyPassword('OtraClaveIncorrecta1', usuarioGuardado.password), false);
+
+    // Dos hashes de la misma contraseña producen salidas distintas gracias a la sal aleatoria
+    assert.notEqual(hashPassword(plainPassword), hashPassword(plainPassword));
+
+    // Verificar que el token devuelto tras el registro permite consultar /api/me inmediatamente
+    const resMe = await apiRequest('/api/me', {
+      token: resRegistro.body.token,
+    });
+    assert.equal(resMe.status, 200);
+    assert.equal(resMe.body.usuario.correo, 'valeria.cardenas@empresa.com');
+
+    // Verificar que también puede iniciar sesión posteriormente con su contraseña
+    const resLogin = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: {
+        correo: 'valeria.cardenas@empresa.com',
+        password: plainPassword,
+      },
+    });
+    assert.equal(resLogin.status, 200);
+    assert.equal(resLogin.body.ok, true);
+  });
+
+  it('rechaza el registro con correo electrónico o documento duplicado devolviendo HTTP 409 Conflict', async () => {
+    // Intento con correo ya existente (insensible a mayúsculas/minúsculas)
+    const resCorreoDuplicado = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        nombres: 'Valeria Copia',
+        apellidos: 'Cárdenas',
+        documento: '1099000111',
+        correo: 'VALERIA.CARDENAS@EMPRESA.COM',
+        password: 'ClaveValida2026',
+      },
+    });
+
+    assert.equal(resCorreoDuplicado.status, 409);
+    assert.equal(resCorreoDuplicado.body.ok, false);
+    assert.equal(resCorreoDuplicado.body.codigo, 'DUPLICADO');
+    assert.equal(resCorreoDuplicado.body.campo, 'correo');
+
+    // Intento con documento ya existente
+    const resDocDuplicado = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        nombres: 'Otro',
+        apellidos: 'Usuario',
+        documento: '1099887766',
+        correo: 'otro.usuario.unico@empresa.com',
+        password: 'ClaveValida2026',
+      },
+    });
+
+    assert.equal(resDocDuplicado.status, 409);
+    assert.equal(resDocDuplicado.body.ok, false);
+    assert.equal(resDocDuplicado.body.codigo, 'DUPLICADO');
+    assert.equal(resDocDuplicado.body.campo, 'documento');
+  });
+
+  it('rechaza el registro cuando la contraseña no cumple la política de seguridad devolviendo HTTP 400', async () => {
+    // Contraseña demasiado corta (< 10 caracteres)
+    const resCorta = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        nombres: 'Esteban',
+        apellidos: 'Pardo',
+        documento: '1077665544',
+        correo: 'esteban.pardo@empresa.com',
+        password: 'Abc123',
+      },
+    });
+    assert.equal(resCorta.status, 400);
+    assert.equal(resCorta.body.ok, false);
+    assert.equal(resCorta.body.codigo, 'VALIDACION');
+    assert.equal(resCorta.body.campo, 'password');
+
+    // Contraseña sin números
+    const resSinNumero = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        nombres: 'Esteban',
+        apellidos: 'Pardo',
+        documento: '1077665544',
+        correo: 'esteban.pardo@empresa.com',
+        password: 'SoloLetrasSeguras',
+      },
+    });
+    assert.equal(resSinNumero.status, 400);
+    assert.equal(resSinNumero.body.campo, 'password');
+  });
+
+  it('rechaza el registro cuando algún campo obligatorio está vacío o el correo es inválido devolviendo HTTP 400', async () => {
+    // Campo obligatorio vacío (nombres vacío)
+    const resNombreVacio = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        nombres: '   ',
+        apellidos: 'Pardo',
+        documento: '1077665544',
+        correo: 'esteban.pardo@empresa.com',
+        password: 'ClaveSegura2026',
+      },
+    });
+    assert.equal(resNombreVacio.status, 400);
+    assert.equal(resNombreVacio.body.ok, false);
+    assert.equal(resNombreVacio.body.codigo, 'VALIDACION');
+    assert.equal(resNombreVacio.body.campo, 'nombres');
+
+    // Correo vacío o con formato inválido
+    const resCorreoInvalido = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: {
+        nombres: 'Esteban',
+        apellidos: 'Pardo',
+        documento: '1077665544',
+        correo: 'correo-sin-formato-valido',
+        password: 'ClaveSegura2026',
+      },
+    });
+    assert.equal(resCorreoInvalido.status, 400);
+    assert.equal(resCorreoInvalido.body.codigo, 'VALIDACION');
+    assert.equal(resCorreoInvalido.body.campo, 'correo');
   });
 });

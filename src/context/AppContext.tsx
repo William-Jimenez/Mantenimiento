@@ -32,9 +32,11 @@ import {
   SEED_USUARIOS,
 } from '../data/seed';
 import {
+  CampoRegistro,
   esEstadoFinal,
   ETIQUETA_PERFIL,
   generarCodigoSolicitud,
+  hashPassword,
   obtenerTransicionesPermitidas,
   puedeAdjuntarEvidencia,
   puedeAsignarTecnico,
@@ -42,7 +44,9 @@ import {
   puedeGestionarUsuarios,
   puedeRegistrarTrabajo,
   puedeVerSolicitud,
+  validarDatosRegistro,
   validarPoliticaPassword,
+  verifyPassword,
 } from '../services/domainRules';
 
 const STORAGE_KEY = 'plataforma_mantenimiento_v2';
@@ -143,6 +147,15 @@ interface AppContextValue {
 
   // Auth (RC-01, P-01, P-02)
   login: (correo: string, password: string) => LoginResult;
+  registrarCuenta: (datos: {
+    nombres: string;
+    apellidos: string;
+    documento: string;
+    correo: string;
+    password: string;
+  }) => ActionResult<{ usuarioId: number }> & {
+    erroresPorCampo?: Partial<Record<CampoRegistro, string>>;
+  };
   logout: (motivo?: string) => void;
   cambiarPasswordInicial: (nuevaPassword: string, confirmacion: string) => ActionResult;
 
@@ -347,7 +360,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Route guard enforcing User Flow 4.3 & RC-01 (P-01, P-02, P-03)
   useEffect(() => {
     if (!currentUser || !currentEmpleado) {
-      if (pathname !== '/login') {
+      if (pathname !== '/login' && pathname !== '/registro') {
         setIntendedPath(pathname + window.location.search);
         navigate('/login', { replace: true });
       }
@@ -361,7 +374,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (pathname === '/login' || pathname === '/cuenta/contrasena') {
+    if (pathname === '/login' || pathname === '/registro' || pathname === '/cuenta/contrasena') {
       navigate('/', { replace: true });
     }
   }, [currentUser, currentEmpleado, pathname, navigate]);
@@ -548,7 +561,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      if (usuario.password !== password) {
+      if (!verifyPassword(password, usuario.password)) {
         const nuevosIntentos = usuario.intentosFallidos + 1;
         const bloqueadoHasta =
           nuevosIntentos >= 5 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null;
@@ -619,6 +632,116 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { ok: true, debeCambiarPassword: usuario.debeCambiarPassword };
     },
     [state.empleados, state.usuarios, intendedPath, navigate]
+  );
+
+  const registrarCuenta: AppContextValue['registrarCuenta'] = useCallback(
+    (datos) => {
+      try {
+        const validacion = validarDatosRegistro(datos);
+        if (!validacion.ok || !validacion.datos) {
+          return {
+            ok: false,
+            codigo: 'VALIDACION',
+            campo: validacion.campo,
+            error: validacion.error ?? 'Verifique los campos obligatorios.',
+            erroresPorCampo: validacion.erroresPorCampo,
+          };
+        }
+
+        const clean = validacion.datos;
+
+        const correoExistente = state.empleados.find(
+          (e) => e.correo.toLowerCase() === clean.correo
+        );
+        if (correoExistente) {
+          return {
+            ok: false,
+            codigo: 'DUPLICADO',
+            campo: 'correo',
+            error: 'Ya existe una cuenta registrada con este correo electrónico.',
+            erroresPorCampo: {
+              correo: 'Ya existe una cuenta registrada con este correo electrónico.',
+            },
+          };
+        }
+
+        const docExistente = state.empleados.find(
+          (e) => e.documento.toLowerCase() === clean.documento.toLowerCase()
+        );
+        if (docExistente) {
+          return {
+            ok: false,
+            codigo: 'DUPLICADO',
+            campo: 'documento',
+            error: 'Ya existe un usuario registrado con este documento de identidad.',
+            erroresPorCampo: {
+              documento: 'Ya existe un usuario registrado con este documento de identidad.',
+            },
+          };
+        }
+
+        const passwordHasheada = hashPassword(clean.password);
+        const nowIso = new Date().toISOString();
+        const nowMs = Date.now();
+        const nextEmpId = Math.max(0, ...state.empleados.map((e) => e.id)) + 1;
+        const nextUsrId = Math.max(0, ...state.usuarios.map((u) => u.id)) + 1;
+
+        const nuevoEmpleado: Empleado = {
+          id: nextEmpId,
+          documento: clean.documento,
+          nombres: clean.nombres,
+          apellidos: clean.apellidos,
+          correo: clean.correo,
+          cargo: 'Cliente',
+          esTecnico: false,
+          activo: true,
+          creadoEn: nowIso,
+          actualizadoEn: nowIso,
+        };
+
+        const nuevoUsuario: Usuario = {
+          id: nextUsrId,
+          empleadoId: nextEmpId,
+          perfil: 'CLIENTE',
+          password: passwordHasheada,
+          debeCambiarPassword: false,
+          activo: true,
+          intentosFallidos: 0,
+          bloqueadoHasta: null,
+          ultimoAcceso: nowIso,
+          creadoEn: nowIso,
+        };
+
+        setState((prev) => ({
+          ...prev,
+          empleados: [...prev.empleados, nuevoEmpleado],
+          usuarios: [...prev.usuarios, nuevoUsuario],
+          session: {
+            usuarioId: nuevoUsuario.id,
+            empleadoId: nuevoEmpleado.id,
+            perfil: 'CLIENTE',
+            esTecnico: false,
+            iniciadaEn: nowMs,
+            ultimaActividad: nowMs,
+          },
+        }));
+
+        setLoginNotice(null);
+        pushToast('exito', `Cuenta creada exitosamente. Bienvenido/a, ${clean.nombres}.`);
+        navigate('/', { replace: true });
+
+        return {
+          ok: true,
+          data: { usuarioId: nuevoUsuario.id },
+        };
+      } catch {
+        return {
+          ok: false,
+          error: 'No fue posible procesar el registro en este momento. Intente nuevamente.',
+        };
+      }
+    },
+    [state.empleados, state.usuarios, navigate, pushToast]
   );
 
   const cambiarPasswordInicial = useCallback(
@@ -1957,6 +2080,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     filtrosSolicitudes,
     setFiltrosSolicitudes,
     login,
+    registrarCuenta,
     logout,
     cambiarPasswordInicial,
     guardarEmpleado,

@@ -9,12 +9,15 @@ import {
 } from '../data/seed';
 import {
   generarCodigoSolicitud,
+  hashPassword,
   obtenerTransicionesPermitidas,
   puedeAsignarTecnico,
   puedeCrearSolicitud,
   puedeGestionarUsuarios,
   puedeRegistrarTrabajo,
   puedeVerSolicitud,
+  validarDatosRegistro,
+  verifyPassword,
 } from '../services/domainRules';
 import {
   Asignacion,
@@ -173,40 +176,155 @@ export function createApiApp(customStore?: BackendStore) {
     };
 
   // ============================================================================
-  // Autenticación
+  // Autenticación y Registro
   // ============================================================================
-  app.post('/api/auth/login', (req: Request, res: Response) => {
-    const rawCorreo = String(req.body?.correo ?? '').trim().toLowerCase();
-    const correo = rawCorreo === 'empleado@empresa.com' ? 'cliente@empresa.com' : rawCorreo;
-    const password = String(req.body?.password ?? '');
+  app.post('/api/auth/register', (req: Request, res: Response) => {
+    try {
+      const validacion = validarDatosRegistro(req.body ?? {});
+      if (!validacion.ok || !validacion.datos) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: validacion.campo,
+          error: validacion.error ?? 'Verifique los datos ingresados.',
+          erroresPorCampo: validacion.erroresPorCampo,
+        });
+        return;
+      }
 
-    const empleado = store.empleados.find((e) => e.correo.toLowerCase() === correo);
-    const usuario = empleado
-      ? store.usuarios.find((u) => u.empleadoId === empleado.id)
-      : undefined;
+      const { nombres, apellidos, documento, correo, password } = validacion.datos;
 
-    if (!empleado || !usuario || !empleado.activo || !usuario.activo || usuario.password !== password) {
-      res.status(401).json({
-        ok: false,
-        codigo: 'CREDENCIALES_INVALIDAS',
-        error: 'Correo o contraseña incorrectos.',
+      const correoDuplicado = store.empleados.find(
+        (e) => e.correo.toLowerCase() === correo
+      );
+      if (correoDuplicado) {
+        res.status(409).json({
+          ok: false,
+          codigo: 'DUPLICADO',
+          campo: 'correo',
+          error: 'Ya existe una cuenta registrada con este correo electrónico.',
+        });
+        return;
+      }
+
+      const docDuplicado = store.empleados.find(
+        (e) => e.documento.toLowerCase() === documento.toLowerCase()
+      );
+      if (docDuplicado) {
+        res.status(409).json({
+          ok: false,
+          codigo: 'DUPLICADO',
+          campo: 'documento',
+          error: 'Ya existe un usuario registrado con este documento de identidad.',
+        });
+        return;
+      }
+
+      const passwordHasheada = hashPassword(password);
+      const now = new Date().toISOString();
+      const nextEmpId = Math.max(0, ...store.empleados.map((e) => e.id)) + 1;
+      const nextUsrId = Math.max(0, ...store.usuarios.map((u) => u.id)) + 1;
+
+      const nuevoEmpleado: Empleado = {
+        id: nextEmpId,
+        documento,
+        nombres,
+        apellidos,
+        correo,
+        cargo: 'Cliente',
+        esTecnico: false,
+        activo: true,
+        creadoEn: now,
+        actualizadoEn: now,
+      };
+
+      const nuevoUsuario: Usuario = {
+        id: nextUsrId,
+        empleadoId: nextEmpId,
+        perfil: 'CLIENTE',
+        password: passwordHasheada,
+        debeCambiarPassword: false,
+        activo: true,
+        intentosFallidos: 0,
+        bloqueadoHasta: null,
+        ultimoAcceso: now,
+        creadoEn: now,
+      };
+
+      store.empleados.push(nuevoEmpleado);
+      store.usuarios.push(nuevoUsuario);
+
+      const token = encodeSessionToken(nuevoUsuario.id, nuevoUsuario.perfil);
+      res.status(201).json({
+        ok: true,
+        mensaje: 'Cuenta creada exitosamente.',
+        token,
+        debeCambiarPassword: false,
+        usuario: {
+          id: nuevoUsuario.id,
+          empleadoId: nuevoEmpleado.id,
+          perfil: nuevoUsuario.perfil,
+          documento: nuevoEmpleado.documento,
+          nombres: nuevoEmpleado.nombres,
+          apellidos: nuevoEmpleado.apellidos,
+          correo: nuevoEmpleado.correo,
+        },
       });
-      return;
+    } catch {
+      res.status(500).json({
+        ok: false,
+        codigo: 'ERROR_INTERNO',
+        error: 'No fue posible procesar el registro en este momento. Intente nuevamente.',
+      });
     }
+  });
 
-    const token = encodeSessionToken(usuario.id, usuario.perfil);
-    res.json({
-      ok: true,
-      token,
-      usuario: {
-        id: usuario.id,
-        empleadoId: empleado.id,
-        perfil: usuario.perfil,
-        nombres: empleado.nombres,
-        apellidos: empleado.apellidos,
-        correo: empleado.correo,
-      },
-    });
+  app.post('/api/auth/login', (req: Request, res: Response) => {
+    try {
+      const rawCorreo = String(req.body?.correo ?? '').trim().toLowerCase();
+      const correo = rawCorreo === 'empleado@empresa.com' ? 'cliente@empresa.com' : rawCorreo;
+      const password = String(req.body?.password ?? '');
+
+      const empleado = store.empleados.find((e) => e.correo.toLowerCase() === correo);
+      const usuario = empleado
+        ? store.usuarios.find((u) => u.empleadoId === empleado.id)
+        : undefined;
+
+      if (
+        !empleado ||
+        !usuario ||
+        !empleado.activo ||
+        !usuario.activo ||
+        !verifyPassword(password, usuario.password)
+      ) {
+        res.status(401).json({
+          ok: false,
+          codigo: 'CREDENCIALES_INVALIDAS',
+          error: 'Correo o contraseña incorrectos.',
+        });
+        return;
+      }
+
+      const token = encodeSessionToken(usuario.id, usuario.perfil);
+      res.json({
+        ok: true,
+        token,
+        usuario: {
+          id: usuario.id,
+          empleadoId: empleado.id,
+          perfil: usuario.perfil,
+          nombres: empleado.nombres,
+          apellidos: empleado.apellidos,
+          correo: empleado.correo,
+        },
+      });
+    } catch {
+      res.status(500).json({
+        ok: false,
+        codigo: 'ERROR_INTERNO',
+        error: 'No fue posible procesar el inicio de sesión en este momento.',
+      });
+    }
   });
 
   app.get('/api/me', requireAuth, (req: Request, res: Response) => {
@@ -815,6 +933,15 @@ export function createApiApp(customStore?: BackendStore) {
       });
     }
   );
+
+  // Manejador global de errores del servidor sin exponer trazas ni detalles internos
+  app.use((_err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    res.status(500).json({
+      ok: false,
+      codigo: 'ERROR_INTERNO',
+      error: 'Ocurrió un error en el servidor. Por favor, intente nuevamente.',
+    });
+  });
 
   return app;
 }

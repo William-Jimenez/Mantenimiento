@@ -40,7 +40,7 @@ export function esEstadoFinal(estado: EstadoNombre): boolean {
  */
 export function tienePermisoRuta(usuario: Usuario | null, pathname: string): boolean {
   if (!usuario || !usuario.activo) {
-    return pathname === '/login';
+    return pathname === '/login' || pathname === '/registro';
   }
 
   if (usuario.debeCambiarPassword) {
@@ -374,3 +374,13 @@ export function formatearTamano(bytes: number): string {
 export function generarCodigoSolicitud(secuencia: number, year = 2026): string {
   return `SM-${year}-${String(secuencia).padStart(6, '0')}`;
 }
+
+export {
+  esPasswordHasheada,
+  hashPassword,
+  validarDatosRegistro,
+  verifyPassword,
+  type CampoRegistro,
+  type RegistroInput,
+  type ResultadoValidacionRegistro,
+} from './passwordSecurity';

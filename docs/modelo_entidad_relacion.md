@@ -236,8 +236,8 @@ erDiagram
 | `id` | BIGINT UNSIGNED | NO | **PK**, AUTO_INCREMENT | N/A | Identificador único de la cuenta de usuario. |
 | `empleado_id` | BIGINT UNSIGNED | NO | **FK**, **UNIQUE** | N/A | Enlace 1:1 con `empleado.id`. Restricción `ON DELETE RESTRICT`. |
 | `perfil` | ENUM('ADMINISTRADOR','EMPLEADO','CLIENTE') | NO | Ninguna | N/A | Jerarquía de rol RBAC: `ADMINISTRADOR` (jefe con control total), `EMPLEADO` (técnico reparador de solicitudes asignadas) o `CLIENTE` (solicitante con acceso restringido a sus propios reportes). |
-| `password_hash` | VARCHAR(100) | NO | Ninguna | N/A | Hash criptográfico seguro generado mediante algoritmo BCrypt (costo >= 10). |
-| `debe_cambiar_password` | BOOLEAN | NO | Ninguna | `1` (true) | Si es `1`, fuerza la redirección al cambio de clave al iniciar sesión (RF-19). |
+| `password_hash` | VARCHAR(150) | NO | Ninguna | N/A | Hash criptográfico seguro con sal aleatoria (PBKDF2-HMAC-SHA256 `$pbkdf2-sha256$10000$<salt>$<hash>` o BCrypt costo >= 10), nunca en texto plano. |
+| `debe_cambiar_password` | BOOLEAN | NO | Ninguna | `1` (true) | Si es `1`, fuerza la redirección al cambio de clave al iniciar sesión (RF-19). En cuentas creadas mediante autorregistro público (`CLIENTE`) se inicializa en `0` (`false`). |
 | `intentos_fallidos` | TINYINT UNSIGNED | NO | Ninguna | `0` | Contador de intentos fallidos. Al llegar a 5 bloquea temporalmente la cuenta. |
 | `bloqueado_hasta` | DATETIME(0) | SÍ | Ninguna | NULL | Marca temporal hasta la cual se deniega el acceso tras bloqueo de seguridad. |
 | `ultimo_acceso` | DATETIME(0) | SÍ | Ninguna | NULL | Estampa de tiempo del último inicio de sesión exitoso. |

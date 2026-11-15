@@ -118,6 +118,7 @@ Diseñar, implementar e integrar una plataforma web robusta para la gestión cor
 #### 1.5.1 Alcance Incluido (Línea Base Confirmada)
 - Aplicación web con diseño responsivo operable en dispositivos móviles y de escritorio.
 - Gestión de usuarios bajo una jerarquía de tres perfiles con control de acceso por rol (RBAC) en frontend y backend: **Administrador** (`ADMINISTRADOR`), **Empleado / Técnico** (`EMPLEADO`) y **Cliente** (`CLIENTE`).
+- Flujo de autorregistro público de usuarios (`/registro`, `POST /api/auth/register`) que permite crear cuentas con rol `CLIENTE`, validando campos obligatorios, formato de correo y política de contraseña tanto en cliente como en servidor, previniendo duplicados por correo o documento (`HTTP 409 Conflict`), almacenando la contraseña mediante hash criptográfico con sal aleatoria (`PBKDF2-HMAC-SHA256`, nunca en texto plano) e iniciando sesión automáticamente tras el registro exitoso.
 - Registro del trabajo técnico realizado (`trabajoRealizado`) sobre las solicitudes asignadas por parte del Empleado técnico o Administrador.
 - Módulo de recursos con códigos únicos de activo, tipo de recurso, nombre, descripción y ubicación.
 - Cuatro tipos canónicos de recursos: *Equipo tecnológico*, *Instalación o edificio*, *Maquinaria* y *Herramienta*.

@@ -106,6 +106,15 @@
   text-transform: uppercase;
 }
 
+/* Validation states after interaction (:user-invalid / :user-valid + JS fallback) */
+.form-input-validated:is(:user-invalid, .user-invalid-fallback) {
+  border-color: var(--color-saffron-spark);
+}
+
+.form-input-validated:is(:user-valid, .user-valid-fallback) {
+  border-color: var(--color-deep-verdant);
+}
+
 /* Scroll-Driven Narrative Entry & Exit Animations (CSS View Timeline + Reduced Motion Compliance) */
 @media (prefers-reduced-motion: no-preference) {
   @supports ((animation-timeline: view()) and (animation-range: entry)) {
