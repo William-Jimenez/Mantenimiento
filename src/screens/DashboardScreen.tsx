@@ -2,7 +2,6 @@ import React from 'react';
 import { useApp, useSolicitudesVisibles } from '../context/AppContext';
 import { ESTADOS_ORDEN, formatearFecha } from '../services/domainRules';
 import { EmptyState, EstadoLabel, GhostButton, PrimaryButton } from '../components/CommonUI';
-import { ConstellationCanvas } from '../components/ConstellationCanvas';
 import { EstadoNombre } from '../types/domain';
 
 export function DashboardScreen() {
@@ -49,12 +48,8 @@ export function DashboardScreen() {
 
   return (
     <div className="space-y-[60px]">
-      {/* Hero header with ambient triangular constellation */}
+      {/* Hero header */}
       <section className="relative overflow-hidden py-[12px]">
-        <ConstellationCanvas
-          mode="ambient"
-          className="absolute inset-0 w-full h-full opacity-55"
-        />
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-[30px]">
           <div className="space-y-[18px] max-w-[760px]">
             <p className="nav-label text-saffron-spark">
