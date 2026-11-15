@@ -211,9 +211,6 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
                 {/* Left side: Uniform typography & narrative explanation */}
                 <div className="narrative-screen-content lg:col-span-6 space-y-[24px]">
                   <div className="flex items-center gap-[12px]">
-                    <span className="inline-flex items-center justify-center px-[12px] py-[4px] rounded-full border border-white/18 text-[12px] font-semibold tabular-nums text-bone-white">
-                      {step.number} / 04
-                    </span>
                     <span className={`nav-label ${step.accentTextClass}`}>
                       {step.eyebrow}
                     </span>
@@ -248,9 +245,6 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
                     {/* Top HUD metadata */}
                     <div className="relative z-10 flex items-center justify-between gap-2 text-[11px] tracking-[0.35px] uppercase text-ash-gray">
                       <span>{step.hudLabel}</span>
-                      <span className="tabular-nums text-bone-white/80">
-                        PASO {step.number}
-                      </span>
                     </div>
 
                     {/* 3D WebGL / Canvas Stage */}
