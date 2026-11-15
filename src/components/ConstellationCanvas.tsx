@@ -140,67 +140,67 @@ export function ConstellationCanvas({
         ctx.restore();
       }
 
-      if (shouldAnimate()) {
-        rafId = window.requestAnimationFrame(draw);
-      }
-    };
-
-    const syncLoop = () => {
-      if (shouldAnimate()) {
-        if (rafId === 0) {
+        if (shouldAnimate()) {
           rafId = window.requestAnimationFrame(draw);
         }
-      } else if (rafId !== 0) {
-        window.cancelAnimationFrame(rafId);
-        rafId = 0;
-      }
-    };
+      };
 
-    draw();
-
-    const handleResize = () => {
-      if (!canvas) return;
-      width = canvas.width = canvas.offsetWidth * window.devicePixelRatio;
-      height = canvas.height = canvas.offsetHeight * window.devicePixelRatio;
-      particles = buildParticles();
-      if (!shouldAnimate()) draw();
-    };
-
-    const handleContentVisibility = (event: Event) => {
-      const cvEvent = event as Event & { skipped?: boolean };
-      if (typeof cvEvent.skipped === 'boolean') {
-        isSkipped = cvEvent.skipped;
-        syncLoop();
-      }
-    };
-
-    let observer: IntersectionObserver | null = null;
-    if (typeof IntersectionObserver !== 'undefined') {
-      observer = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            isVisible = entry.isIntersecting;
+      const syncLoop = () => {
+        if (shouldAnimate()) {
+          if (rafId === 0) {
+            rafId = window.requestAnimationFrame(draw);
           }
-          syncLoop();
-        },
-        { rootMargin: '200px' }
-      );
-      observer.observe(canvas);
-    }
+        } else if (rafId !== 0) {
+          window.cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+      };
 
-    window.addEventListener('resize', handleResize);
-    document.addEventListener('visibilitychange', syncLoop);
-    canvas.addEventListener('contentvisibilityautostatechange', handleContentVisibility);
-    return () => {
-      if (rafId !== 0) {
-        window.cancelAnimationFrame(rafId);
+      draw();
+
+      const handleResize = () => {
+        if (!canvas) return;
+        width = canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+        height = canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+        particles = buildParticles();
+        if (!shouldAnimate()) draw();
+      };
+
+      const handleContentVisibility = (event: Event) => {
+        const cvEvent = event as Event & { skipped?: boolean };
+        if (typeof cvEvent.skipped === 'boolean') {
+          isSkipped = cvEvent.skipped;
+          syncLoop();
+        }
+      };
+
+      let observer: IntersectionObserver | null = null;
+      if (typeof IntersectionObserver !== 'undefined') {
+        observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              isVisible = entry.isIntersecting;
+            }
+            syncLoop();
+          },
+          { rootMargin: '200px' }
+        );
+        observer.observe(canvas);
       }
-      observer?.disconnect();
-      window.removeEventListener('resize', handleResize);
-      document.removeEventListener('visibilitychange', syncLoop);
-      canvas.removeEventListener('contentvisibilityautostatechange', handleContentVisibility);
-    };
-  }, [mode]);
+
+      window.addEventListener('resize', handleResize);
+      document.addEventListener('visibilitychange', syncLoop);
+      canvas.addEventListener('contentvisibilityautostatechange', handleContentVisibility);
+      return () => {
+        if (rafId !== 0) {
+          window.cancelAnimationFrame(rafId);
+        }
+        observer?.disconnect();
+        window.removeEventListener('resize', handleResize);
+        document.removeEventListener('visibilitychange', syncLoop);
+        canvas.removeEventListener('contentvisibilityautostatechange', handleContentVisibility);
+      };
+    }, [mode]);
 
   return (
     <canvas

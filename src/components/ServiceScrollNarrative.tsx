@@ -148,30 +148,30 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
               const clamped = Math.max(0, Math.min(1, rawProgress));
               next[idx] = clamped;
 
-              if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
-                setActiveIndex(idx);
-              }
+                if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
+                  setActiveIndex(idx);
+                }
 
-              // Fallback animation when native CSS Scroll-Driven Animations are unavailable
-              if (!supportsNativeViewTimeline && !prefersNoMotion) {
-                const contentEl = entry.target.querySelector<HTMLElement>(
-                  '.narrative-screen-content'
-                );
-                const stageEl = entry.target.querySelector<HTMLElement>(
-                  '.narrative-stage-3d'
-                );
-                const visibility = Math.min(1, entry.intersectionRatio * 1.65);
-                if (contentEl) {
-                  contentEl.style.opacity = `${0.18 + visibility * 0.82}`;
-                  contentEl.style.transform = `translate3d(0, ${(1 - visibility) * 28}px, 0)`;
-                }
-                if (stageEl) {
-                  stageEl.style.opacity = `${0.2 + visibility * 0.8}`;
-                  stageEl.style.transform = `scale(${0.92 + visibility * 0.08})`;
+                // Fallback animation when native CSS Scroll-Driven Animations are unavailable
+                if (!supportsNativeViewTimeline && !prefersNoMotion) {
+                  const contentEl = entry.target.querySelector<HTMLElement>(
+                    '.narrative-screen-content'
+                  );
+                  const stageEl = entry.target.querySelector<HTMLElement>(
+                    '.narrative-stage-3d'
+                  );
+                  const visibility = Math.min(1, entry.intersectionRatio * 1.65);
+                  if (contentEl) {
+                    contentEl.style.opacity = `${0.18 + visibility * 0.82}`;
+                    contentEl.style.transform = `translate3d(0, ${(1 - visibility) * 28}px, 0)`;
+                  }
+                  if (stageEl) {
+                    stageEl.style.opacity = `${0.2 + visibility * 0.8}`;
+                    stageEl.style.transform = `scale(${0.92 + visibility * 0.08})`;
+                  }
                 }
               }
-            }
-          });
+            });
           return next;
         });
       },

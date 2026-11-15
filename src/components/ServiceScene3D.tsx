@@ -570,155 +570,155 @@ export function ServiceScene3D({
       const targetProgress = progressRef.current;
       smoothedProgress += (targetProgress - smoothedProgress) * 0.12;
 
-      const animateIdle = !prefersReducedMotion && !pausedRef.current;
-      if (animateIdle) {
-        clock += 0.012;
-      }
+        const animateIdle = !prefersReducedMotion && !pausedRef.current;
+        if (animateIdle) {
+          clock += 0.012;
+        }
 
-      // Base scroll-driven orientation + gentle idle rotation
-      const scrollAngle = smoothedProgress * Math.PI * 1.35;
-      rootGroup.rotation.y = scrollAngle + clock * 0.45;
-      rootGroup.rotation.x = Math.sin(smoothedProgress * Math.PI - 0.5) * 0.28;
+        // Base scroll-driven orientation + gentle idle rotation
+        const scrollAngle = smoothedProgress * Math.PI * 1.35;
+        rootGroup.rotation.y = scrollAngle + clock * 0.45;
+        rootGroup.rotation.x = Math.sin(smoothedProgress * Math.PI - 0.5) * 0.28;
 
-      if (variant === 'core-network') {
-        if (primaryMesh) primaryMesh.rotation.z = clock * 0.25;
-        if (secondaryMesh) {
-          secondaryMesh.rotation.y = -clock * 0.6 - scrollAngle * 0.5;
-          const pulse = 0.92 + Math.sin(clock * 2 + smoothedProgress * 4) * 0.08;
-          secondaryMesh.scale.setScalar(pulse);
-        }
-        if (tertiaryMesh) {
-          tertiaryMesh.rotation.y = clock * 0.35 + scrollAngle * 0.4;
-        }
-      } else if (variant === 'diagnostic-scanner') {
-        if (secondaryMesh) {
-          secondaryMesh.rotation.y = -clock * 0.5 + scrollAngle;
-        }
-        if (tertiaryMesh) {
-          // Vertical scan sweep driven by scroll + idle wave
-          const sweep = animateIdle
-            ? Math.sin(clock * 1.8 + smoothedProgress * Math.PI * 2) * 0.72
-            : (smoothedProgress - 0.5) * 1.3;
-          tertiaryMesh.position.y = sweep;
-        }
-      } else if (variant === 'precision-gears') {
-        if (primaryMesh) {
-          primaryMesh.rotation.x = clock * 0.5 + scrollAngle * 0.8;
-        }
-        if (secondaryMesh) {
-          secondaryMesh.rotation.y = -clock * 0.65 - scrollAngle;
-          secondaryMesh.rotation.z = clock * 0.3;
-        }
-        if (tertiaryMesh) {
-          tertiaryMesh.rotation.x = -clock * 0.4;
-          tertiaryMesh.rotation.y = clock * 0.8;
-        }
-      } else if (variant === 'shield-metrics') {
-        if (primaryMesh) {
-          primaryMesh.rotation.y = clock * 0.3 + scrollAngle * 0.5;
-        }
-        if (secondaryMesh) {
-          secondaryMesh.rotation.y = -clock * 0.45;
-          secondaryMesh.position.y = Math.sin(clock * 1.5) * 0.08;
-        }
-        if (tertiaryMesh) {
-          tertiaryMesh.position.y = -0.65 + smoothedProgress * 1.3;
-          tertiaryMesh.rotation.z = clock * 0.5;
-        }
-      }
-
-      renderer.render(scene, camera);
-
-      if (shouldRunContinuously()) {
-        rafId = window.requestAnimationFrame(renderScene);
-      }
-    };
-
-    const syncLoop = (forceSingleFrame = false) => {
-      if (shouldRunContinuously()) {
-        if (rafId === 0) {
-          rafId = window.requestAnimationFrame(renderScene);
-        }
-      } else {
-        if (rafId !== 0) {
-          window.cancelAnimationFrame(rafId);
-          rafId = 0;
-        }
-        if (forceSingleFrame) {
-          renderScene();
-        }
-      }
-    };
-
-    syncLoopRef.current = syncLoop;
-    renderScene();
-
-    const handleResize = () => {
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = Math.max(container.clientHeight, 1);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h, false);
-      renderer.render(scene, camera);
-    };
-
-    const handleMotionChange = (e: MediaQueryListEvent) => {
-      prefersReducedMotion = e.matches;
-      syncLoop(true);
-    };
-
-    const handleContentVisibilityChange = (event: Event) => {
-      const cvEvent = event as Event & { skipped?: boolean };
-      if (typeof cvEvent.skipped === 'boolean') {
-        isContentSkipped = cvEvent.skipped;
-        syncLoop(true);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      syncLoop(true);
-    };
-
-    let viewportObserver: IntersectionObserver | null = null;
-    if (typeof IntersectionObserver !== 'undefined') {
-      viewportObserver = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            isNearViewport = entry.isIntersecting;
+        if (variant === 'core-network') {
+          if (primaryMesh) primaryMesh.rotation.z = clock * 0.25;
+          if (secondaryMesh) {
+            secondaryMesh.rotation.y = -clock * 0.6 - scrollAngle * 0.5;
+            const pulse = 0.92 + Math.sin(clock * 2 + smoothedProgress * 4) * 0.08;
+            secondaryMesh.scale.setScalar(pulse);
           }
+          if (tertiaryMesh) {
+            tertiaryMesh.rotation.y = clock * 0.35 + scrollAngle * 0.4;
+          }
+        } else if (variant === 'diagnostic-scanner') {
+          if (secondaryMesh) {
+            secondaryMesh.rotation.y = -clock * 0.5 + scrollAngle;
+          }
+          if (tertiaryMesh) {
+            // Vertical scan sweep driven by scroll + idle wave
+            const sweep = animateIdle
+              ? Math.sin(clock * 1.8 + smoothedProgress * Math.PI * 2) * 0.72
+              : (smoothedProgress - 0.5) * 1.3;
+            tertiaryMesh.position.y = sweep;
+          }
+        } else if (variant === 'precision-gears') {
+          if (primaryMesh) {
+            primaryMesh.rotation.x = clock * 0.5 + scrollAngle * 0.8;
+          }
+          if (secondaryMesh) {
+            secondaryMesh.rotation.y = -clock * 0.65 - scrollAngle;
+            secondaryMesh.rotation.z = clock * 0.3;
+          }
+          if (tertiaryMesh) {
+            tertiaryMesh.rotation.x = -clock * 0.4;
+            tertiaryMesh.rotation.y = clock * 0.8;
+          }
+        } else if (variant === 'shield-metrics') {
+          if (primaryMesh) {
+            primaryMesh.rotation.y = clock * 0.3 + scrollAngle * 0.5;
+          }
+          if (secondaryMesh) {
+            secondaryMesh.rotation.y = -clock * 0.45;
+            secondaryMesh.position.y = Math.sin(clock * 1.5) * 0.08;
+          }
+          if (tertiaryMesh) {
+            tertiaryMesh.position.y = -0.65 + smoothedProgress * 1.3;
+            tertiaryMesh.rotation.z = clock * 0.5;
+          }
+        }
+
+        renderer.render(scene, camera);
+
+          if (shouldRunContinuously()) {
+            rafId = window.requestAnimationFrame(renderScene);
+          }
+        };
+
+        const syncLoop = (forceSingleFrame = false) => {
+          if (shouldRunContinuously()) {
+            if (rafId === 0) {
+              rafId = window.requestAnimationFrame(renderScene);
+            }
+          } else {
+            if (rafId !== 0) {
+              window.cancelAnimationFrame(rafId);
+              rafId = 0;
+            }
+            if (forceSingleFrame) {
+              renderScene();
+            }
+          }
+        };
+
+        syncLoopRef.current = syncLoop;
+        renderScene();
+
+        const handleResize = () => {
+          if (!container) return;
+          const w = container.clientWidth;
+          const h = Math.max(container.clientHeight, 1);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h, false);
+          renderer.render(scene, camera);
+        };
+
+        const handleMotionChange = (e: MediaQueryListEvent) => {
+          prefersReducedMotion = e.matches;
           syncLoop(true);
-        },
-        { rootMargin: '200px' }
-      );
-      viewportObserver.observe(container);
-    }
+        };
 
-    window.addEventListener('resize', handleResize);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    container.addEventListener(
-      'contentvisibilityautostatechange',
-      handleContentVisibilityChange
-    );
-    mediaQuery.addEventListener('change', handleMotionChange);
+        const handleContentVisibilityChange = (event: Event) => {
+          const cvEvent = event as Event & { skipped?: boolean };
+          if (typeof cvEvent.skipped === 'boolean') {
+            isContentSkipped = cvEvent.skipped;
+            syncLoop(true);
+          }
+        };
 
-    return () => {
-      syncLoopRef.current = null;
-      if (rafId !== 0) {
-        window.cancelAnimationFrame(rafId);
-      }
-      viewportObserver?.disconnect();
-      window.removeEventListener('resize', handleResize);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      container.removeEventListener(
-        'contentvisibilityautostatechange',
-        handleContentVisibilityChange
-      );
-      mediaQuery.removeEventListener('change', handleMotionChange);
-      disposables.forEach((d) => d.dispose());
-      renderer.dispose();
-    };
-  }, [variant]);
+        const handleVisibilityChange = () => {
+          syncLoop(true);
+        };
+
+        let viewportObserver: IntersectionObserver | null = null;
+        if (typeof IntersectionObserver !== 'undefined') {
+          viewportObserver = new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) {
+                isNearViewport = entry.isIntersecting;
+              }
+              syncLoop(true);
+            },
+            { rootMargin: '200px' }
+          );
+          viewportObserver.observe(container);
+        }
+
+        window.addEventListener('resize', handleResize);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        container.addEventListener(
+          'contentvisibilityautostatechange',
+          handleContentVisibilityChange
+        );
+        mediaQuery.addEventListener('change', handleMotionChange);
+
+        return () => {
+          syncLoopRef.current = null;
+          if (rafId !== 0) {
+            window.cancelAnimationFrame(rafId);
+          }
+          viewportObserver?.disconnect();
+          window.removeEventListener('resize', handleResize);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          container.removeEventListener(
+            'contentvisibilityautostatechange',
+            handleContentVisibilityChange
+          );
+          mediaQuery.removeEventListener('change', handleMotionChange);
+          disposables.forEach((d) => d.dispose());
+          renderer.dispose();
+        };
+      }, [variant]);
 
   // Trigger a single frame update when scrollProgress or isActive/isPaused changes
   // (especially important when reduced-motion or pause is active)
