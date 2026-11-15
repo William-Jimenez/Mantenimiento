@@ -98,6 +98,9 @@ interface ServiceScrollNarrativeProps {
 export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrativeProps) {
   const sectionRefs = useRef<Array<HTMLElement | null>>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [intersectingMap, setIntersectingMap] = useState<boolean[]>(() =>
+    SERVICE_NARRATIVE_STEPS.map((_, idx) => idx <= 1)
+  );
   const [progressMap, setProgressMap] = useState<number[]>(() =>
     SERVICE_NARRATIVE_STEPS.map((_, idx) => (idx === 0 ? 0.35 : 0))
   );
@@ -120,6 +123,18 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
 
     const observer = new IntersectionObserver(
       (entries) => {
+        setIntersectingMap((prev) => {
+          const next = [...prev];
+          entries.forEach((entry) => {
+            const indexAttr = entry.target.getAttribute('data-step-index');
+            const idx = indexAttr ? Number(indexAttr) : -1;
+            if (idx >= 0 && idx < next.length) {
+              next[idx] = entry.isIntersecting;
+            }
+          });
+          return next;
+        });
+
         setProgressMap((prev) => {
           const next = [...prev];
           entries.forEach((entry) => {
@@ -133,7 +148,7 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
               const clamped = Math.max(0, Math.min(1, rawProgress));
               next[idx] = clamped;
 
-              if (entry.isIntersecting && entry.intersectionRatio >= 0.35) {
+              if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
                 setActiveIndex(idx);
               }
 
@@ -179,7 +194,8 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
       <div className="divide-y divide-white/8">
         {SERVICE_NARRATIVE_STEPS.map((step, index) => {
           const stepProgress = progressMap[index] ?? 0;
-          const isStepActive = Math.abs(activeIndex - index) <= 1;
+          const isStepActive =
+            Boolean(intersectingMap[index]) || Math.abs(activeIndex - index) <= 1;
 
           return (
             <article

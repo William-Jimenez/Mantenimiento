@@ -107,8 +107,14 @@ export function ConstellationCanvas({
     let particles = buildParticles();
     let rafId = 0;
     let tick = 0;
+    let isVisible = true;
+    let isSkipped = false;
+
+    const shouldAnimate = () =>
+      !prefersReducedMotion && isVisible && !isSkipped && !document.hidden;
 
     const draw = () => {
+      rafId = 0;
       ctx.clearRect(0, 0, width, height);
       tick += 0.012;
 
@@ -134,8 +140,19 @@ export function ConstellationCanvas({
         ctx.restore();
       }
 
-      if (!prefersReducedMotion) {
+      if (shouldAnimate()) {
         rafId = window.requestAnimationFrame(draw);
+      }
+    };
+
+    const syncLoop = () => {
+      if (shouldAnimate()) {
+        if (rafId === 0) {
+          rafId = window.requestAnimationFrame(draw);
+        }
+      } else if (rafId !== 0) {
+        window.cancelAnimationFrame(rafId);
+        rafId = 0;
       }
     };
 
@@ -146,13 +163,42 @@ export function ConstellationCanvas({
       width = canvas.width = canvas.offsetWidth * window.devicePixelRatio;
       height = canvas.height = canvas.offsetHeight * window.devicePixelRatio;
       particles = buildParticles();
-      if (prefersReducedMotion) draw();
+      if (!shouldAnimate()) draw();
     };
 
+    const handleContentVisibility = (event: Event) => {
+      const cvEvent = event as Event & { skipped?: boolean };
+      if (typeof cvEvent.skipped === 'boolean') {
+        isSkipped = cvEvent.skipped;
+        syncLoop();
+      }
+    };
+
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== 'undefined') {
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            isVisible = entry.isIntersecting;
+          }
+          syncLoop();
+        },
+        { rootMargin: '200px' }
+      );
+      observer.observe(canvas);
+    }
+
     window.addEventListener('resize', handleResize);
+    document.addEventListener('visibilitychange', syncLoop);
+    canvas.addEventListener('contentvisibilityautostatechange', handleContentVisibility);
     return () => {
-      window.cancelAnimationFrame(rafId);
+      if (rafId !== 0) {
+        window.cancelAnimationFrame(rafId);
+      }
+      observer?.disconnect();
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', syncLoop);
+      canvas.removeEventListener('contentvisibilityautostatechange', handleContentVisibility);
     };
   }, [mode]);
 

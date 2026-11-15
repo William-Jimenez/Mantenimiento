@@ -220,18 +220,22 @@ export function ServiceScene3D({
   const progressRef = useRef(scrollProgress);
   const activeRef = useRef(isActive);
   const pausedRef = useRef(isPaused);
+  const syncLoopRef = useRef<((forceSingleFrame?: boolean) => void) | null>(null);
   const [webglSupported, setWebglSupported] = useState(true);
 
   useEffect(() => {
     progressRef.current = scrollProgress;
+    syncLoopRef.current?.(true);
   }, [scrollProgress]);
 
   useEffect(() => {
     activeRef.current = isActive;
+    syncLoopRef.current?.(true);
   }, [isActive]);
 
   useEffect(() => {
     pausedRef.current = isPaused;
+    syncLoopRef.current?.(true);
   }, [isPaused]);
 
   useEffect(() => {
@@ -551,13 +555,23 @@ export function ServiceScene3D({
     let rafId = 0;
     let clock = 0;
     let smoothedProgress = progressRef.current;
+    let isNearViewport = true;
+    let isContentSkipped = false;
+
+    const shouldRunContinuously = () =>
+      !prefersReducedMotion &&
+      !pausedRef.current &&
+      !isContentSkipped &&
+      !document.hidden &&
+      (activeRef.current || isNearViewport);
 
     const renderScene = () => {
+      rafId = 0;
       const targetProgress = progressRef.current;
       smoothedProgress += (targetProgress - smoothedProgress) * 0.12;
 
-      const shouldAnimateContinuously = !prefersReducedMotion && !pausedRef.current;
-      if (shouldAnimateContinuously) {
+      const animateIdle = !prefersReducedMotion && !pausedRef.current;
+      if (animateIdle) {
         clock += 0.012;
       }
 
@@ -582,7 +596,7 @@ export function ServiceScene3D({
         }
         if (tertiaryMesh) {
           // Vertical scan sweep driven by scroll + idle wave
-          const sweep = shouldAnimateContinuously
+          const sweep = animateIdle
             ? Math.sin(clock * 1.8 + smoothedProgress * Math.PI * 2) * 0.72
             : (smoothedProgress - 0.5) * 1.3;
           tertiaryMesh.position.y = sweep;
@@ -615,11 +629,28 @@ export function ServiceScene3D({
 
       renderer.render(scene, camera);
 
-      if (activeRef.current && shouldAnimateContinuously) {
+      if (shouldRunContinuously()) {
         rafId = window.requestAnimationFrame(renderScene);
       }
     };
 
+    const syncLoop = (forceSingleFrame = false) => {
+      if (shouldRunContinuously()) {
+        if (rafId === 0) {
+          rafId = window.requestAnimationFrame(renderScene);
+        }
+      } else {
+        if (rafId !== 0) {
+          window.cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
+        if (forceSingleFrame) {
+          renderScene();
+        }
+      }
+    };
+
+    syncLoopRef.current = syncLoop;
     renderScene();
 
     const handleResize = () => {
@@ -634,16 +665,55 @@ export function ServiceScene3D({
 
     const handleMotionChange = (e: MediaQueryListEvent) => {
       prefersReducedMotion = e.matches;
-      window.cancelAnimationFrame(rafId);
-      renderScene();
+      syncLoop(true);
     };
 
+    const handleContentVisibilityChange = (event: Event) => {
+      const cvEvent = event as Event & { skipped?: boolean };
+      if (typeof cvEvent.skipped === 'boolean') {
+        isContentSkipped = cvEvent.skipped;
+        syncLoop(true);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      syncLoop(true);
+    };
+
+    let viewportObserver: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== 'undefined') {
+      viewportObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            isNearViewport = entry.isIntersecting;
+          }
+          syncLoop(true);
+        },
+        { rootMargin: '200px' }
+      );
+      viewportObserver.observe(container);
+    }
+
     window.addEventListener('resize', handleResize);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    container.addEventListener(
+      'contentvisibilityautostatechange',
+      handleContentVisibilityChange
+    );
     mediaQuery.addEventListener('change', handleMotionChange);
 
     return () => {
-      window.cancelAnimationFrame(rafId);
+      syncLoopRef.current = null;
+      if (rafId !== 0) {
+        window.cancelAnimationFrame(rafId);
+      }
+      viewportObserver?.disconnect();
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      container.removeEventListener(
+        'contentvisibilityautostatechange',
+        handleContentVisibilityChange
+      );
       mediaQuery.removeEventListener('change', handleMotionChange);
       disposables.forEach((d) => d.dispose());
       renderer.dispose();
