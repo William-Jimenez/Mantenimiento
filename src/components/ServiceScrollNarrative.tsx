@@ -243,8 +243,15 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
                 <div className="narrative-stage-3d lg:col-span-6">
                   <div className="relative h-[300px] sm:h-[360px] lg:h-[440px] w-full rounded-[24px] border border-white/12 bg-white/[0.02] overflow-hidden flex flex-col justify-between p-[18px] sm:p-[24px]">
                     {/* Top HUD metadata */}
-                    <div className="relative z-10 flex items-center justify-between gap-2 text-[11px] tracking-[0.35px] uppercase text-ash-gray">
+                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 text-[11px] tracking-[0.35px] uppercase text-ash-gray">
                       <span>{step.hudLabel}</span>
+                      <span className="flex items-center gap-[8px] text-[12px] normal-case tracking-normal text-silver-mist">
+                        <span
+                          className="w-[8px] h-[8px] rounded-full inline-block shrink-0"
+                          style={{ backgroundColor: step.accentHex }}
+                        />
+                        {step.hudMetric}
+                      </span>
                     </div>
 
                     {/* 3D WebGL / Canvas Stage */}
@@ -256,20 +263,6 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
                         isPaused={isPaused}
                         accentColor={step.accentHex}
                       />
-                    </div>
-
-                    {/* Bottom HUD status bar */}
-                    <div className="relative z-10 flex items-center justify-between gap-2 pt-[12px] border-t border-white/10 text-[12px] text-silver-mist">
-                      <span className="flex items-center gap-[8px]">
-                        <span
-                          className="w-[8px] h-[8px] rounded-full inline-block"
-                          style={{ backgroundColor: step.accentHex }}
-                        />
-                        {step.hudMetric}
-                      </span>
-                      <span className="text-ash-gray tabular-nums">
-                        {Math.round(stepProgress * 100)}%
-                      </span>
                     </div>
                   </div>
                 </div>
