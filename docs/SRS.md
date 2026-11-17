@@ -969,7 +969,7 @@ La siguiente matriz vincula de forma cruzada y bidireccional los objetivos de ne
 
 | Objetivo Específico | Historia de Usuario | Requerimiento Funcional | Entidades / Clases Asociadas | Módulo del Sistema |
 | :--- | :--- | :--- | :--- | :--- |
-| **O1** (Registro y Usuarios) | HU-01, HU-02 | RF-01, RF-02, RF-19 | `Empleado`, `Usuario` | M1: Gestión de Usuarios |
+| **O1** (Registro y Usuarios) | HU-01, HU-02, HU-19 | RF-01, RF-02, RF-19 | `Empleado`, `Usuario` | M1: Gestión de Usuarios |
 | **O1** (Recursos y Tipos) | HU-04 | RF-04 | `Recurso`, `TipoRecurso` | M2: Catálogo de Recursos |
 | **O2** (Radicación y Evidencias) | HU-05, HU-06, HU-07, HU-10 | RF-05, RF-06, RF-07, RF-10 | `Solicitud`, `Evidencia` | M3: Solicitudes y Evidencias |
 | **O3** (Técnicos y Asignación) | HU-03, HU-11 | RF-03, RF-11 | `Empleado` (`esTecnico`), `Asignacion` | M4: Técnicos y Asignaciones |
