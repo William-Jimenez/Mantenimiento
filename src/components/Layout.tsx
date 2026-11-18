@@ -12,6 +12,46 @@ interface NavLinkItem {
   matchPrefix?: boolean;
 }
 
+export function ToastFeedbackBanner() {
+  const { toasts, dismissToast } = useApp();
+  if (toasts.length === 0) return null;
+
+  return (
+    <div
+      aria-live="polite"
+      data-testid="toast-feedback-banner"
+      className="fixed bottom-[36px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-[12px] max-w-[420px] w-[calc(100%-36px)] pointer-events-none"
+    >
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className="pointer-events-auto w-full bg-void border border-white/25 rounded-[24px] px-[20px] py-[14px] flex items-center justify-between gap-[12px] shadow-lg"
+        >
+          <span
+            className={`text-[14px] ${
+              toast.tipo === 'error'
+                ? 'text-saffron-spark'
+                : toast.tipo === 'aviso'
+                ? 'text-saffron-spark'
+                : 'text-deep-verdant'
+            }`}
+          >
+            {toast.texto}
+          </span>
+          <button
+            type="button"
+            onClick={() => dismissToast(toast.id)}
+            aria-label="Cerrar notificación"
+            className="text-ash-gray hover:text-bone-white p-1 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const {
     pathname,
@@ -111,7 +151,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   {ETIQUETA_PERFIL[currentUser.perfil]}
                 </span>
                 <span aria-hidden="true" className="text-ash-gray">·</span>
-                <GhostButton onClick={() => logout('Sesión cerrada')}>
+                <GhostButton onClick={() => logout()}>
                   Cerrar sesión
                 </GhostButton>
               </div>
@@ -144,7 +184,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="text-silver-mist">
                   {currentEmpleado.nombres} {currentEmpleado.apellidos} ({ETIQUETA_PERFIL[currentUser.perfil]})
                 </span>
-                <GhostButton onClick={() => logout('Sesión cerrada')}>
+                <GhostButton onClick={() => logout()}>
                   Cerrar sesión
                 </GhostButton>
               </div>
@@ -177,40 +217,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
       )}
 
-      {/* Toast Feedback Banner */}
-      {toasts.length > 0 && (
-        <div
-          aria-live="polite"
-          className="fixed bottom-[24px] right-[24px] z-50 flex flex-col gap-[12px] max-w-[400px] w-[calc(100%-36px)]"
-        >
-          {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className="bg-void border border-white/25 rounded-[24px] px-[20px] py-[14px] flex items-center justify-between gap-[12px]"
-            >
-              <span
-                className={`text-[14px] ${
-                  toast.tipo === 'error'
-                    ? 'text-saffron-spark'
-                    : toast.tipo === 'aviso'
-                    ? 'text-saffron-spark'
-                    : 'text-deep-verdant'
-                }`}
-              >
-                {toast.texto}
-              </span>
-              <button
-                type="button"
-                onClick={() => dismissToast(toast.id)}
-                aria-label="Cerrar notificación"
-                className="text-ash-gray hover:text-bone-white p-1 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Toast Feedback Banner (parte media-baja de la pantalla, máx 3 s) */}
+      <ToastFeedbackBanner />
 
       {/* Main Viewport */}
       <main className="flex-1 w-full max-w-[1280px] mx-auto px-[18px] sm:px-[30px] py-[36px] sm:py-[60px]">
@@ -238,7 +246,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </p>
         <div className="flex flex-wrap items-center gap-[18px]">
           <PrimaryButton onClick={extendSession}>Seguir conectado</PrimaryButton>
-          <OutlineButton onClick={() => logout('Sesión cerrada')}>Cerrar sesión</OutlineButton>
+          <OutlineButton onClick={() => logout()}>Cerrar sesión</OutlineButton>
         </div>
       </ModalDialog>
     </div>

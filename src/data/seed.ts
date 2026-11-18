@@ -178,7 +178,7 @@ export const SEED_USUARIOS: Usuario[] = [
     id: 1,
     empleadoId: 1,
     perfil: 'ADMINISTRADOR',
-    password: 'Admin2026Seguro',
+    password: '$pbkdf2-sha256$10000$2d440b6cc34eda3a9f55087656ddcc94$4df5fb3725e686b5adb2887ffdd2ea00340c22bc7b26a91a0f5699cd656dec19',
     debeCambiarPassword: false,
     intentosFallidos: 0,
     bloqueadoHasta: null,

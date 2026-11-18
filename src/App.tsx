@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { AppLayout } from './components/Layout';
+import { AppLayout, ToastFeedbackBanner } from './components/Layout';
 import { LoginScreen } from './screens/LoginScreen';
 import { ChangePasswordScreen } from './screens/ChangePasswordScreen';
 import { DashboardScreen } from './screens/DashboardScreen';
@@ -26,9 +26,19 @@ function RouterView() {
   // P-01 & P-02: Anonymous login or dedicated password recovery/change screen
   if (!currentUser) {
     if (pathname === '/recuperar-contrasena' || pathname === '/cuenta/contrasena') {
-      return <ChangePasswordScreen />;
+      return (
+        <>
+          <ChangePasswordScreen />
+          <ToastFeedbackBanner />
+        </>
+      );
     }
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen />
+        <ToastFeedbackBanner />
+      </>
+    );
   }
 
   // P-02: Mandatory temporary password change or explicit password change screen
@@ -37,7 +47,12 @@ function RouterView() {
     pathname === '/recuperar-contrasena' ||
     pathname === '/cuenta/contrasena'
   ) {
-    return <ChangePasswordScreen />;
+    return (
+      <>
+        <ChangePasswordScreen />
+        <ToastFeedbackBanner />
+      </>
+    );
   }
 
   // Authenticated routes inside AppLayout with central RBAC guard

@@ -176,7 +176,7 @@ export function ChangePasswordScreen() {
   const handleVolver = () => {
     if (currentUser) {
       if (currentUser.debeCambiarPassword) {
-        logout('Sesión cerrada');
+        logout();
       } else {
         navigate('/');
       }
@@ -205,7 +205,7 @@ export function ChangePasswordScreen() {
         <div className="flex flex-wrap items-center gap-[12px]">
           <ThemeLanguageControls />
           {currentUser ? (
-            <GhostButton onClick={() => logout('Sesión cerrada')}>Cerrar sesión</GhostButton>
+            <GhostButton onClick={() => logout()}>Cerrar sesión</GhostButton>
           ) : (
             <GhostButton onClick={() => navigate('/login')}>
               <span className="inline-flex items-center gap-[6px]">

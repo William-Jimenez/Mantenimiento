@@ -680,7 +680,7 @@ export function LoginScreen() {
                     <span>Administrador (admin@empresa.com)</span>
                     <button
                       type="button"
-                      onClick={() => prefill('admin@empresa.com', 'Admin2026Seguro')}
+                      onClick={() => prefill('admin@empresa.com', '')}
                       className="text-saffron-spark hover:underline cursor-pointer"
                     >
                       Usar

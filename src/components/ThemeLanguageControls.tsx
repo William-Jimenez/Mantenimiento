@@ -26,7 +26,7 @@ export function ThemeLanguageControls({ className = '' }: { className?: string }
       aria-label={isEs ? 'Preferencias de visualización e idioma' : 'Display and language preferences'}
       className={`inline-flex items-center gap-[8px] shrink-0 ${className}`}
     >
-      {/* Botón para alternar tema entre oscuro y claro */}
+      {/* Botón para alternar tema entre oscuro y claro (solo icono, sin texto visible) */}
       <button
         type="button"
         data-testid="theme-toggle-btn"
@@ -34,18 +34,17 @@ export function ThemeLanguageControls({ className = '' }: { className?: string }
         aria-label={themeAriaLabel}
         aria-pressed={!isDark}
         title={themeAriaLabel}
-        className={`inline-flex items-center gap-[6px] px-[12px] py-[6px] min-h-[36px] rounded-full border text-[12px] font-semibold uppercase tracking-[0.35px] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-electric-iris focus-visible:outline-offset-2 ${
+        className={`inline-flex items-center justify-center w-[36px] h-[36px] min-h-[36px] rounded-full border transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-electric-iris focus-visible:outline-offset-2 ${
           isDark
             ? 'border-white/20 bg-white/[0.04] text-bone-white hover:border-saffron-spark'
             : 'border-saffron-spark/60 bg-saffron-spark/10 text-bone-white hover:border-electric-iris'
         }`}
       >
         {isDark ? (
-          <Moon className="w-[14px] h-[14px] text-electric-iris shrink-0" aria-hidden="true" />
+          <Moon className="w-[15px] h-[15px] text-electric-iris shrink-0" aria-hidden="true" />
         ) : (
-          <Sun className="w-[14px] h-[14px] text-saffron-spark shrink-0" aria-hidden="true" />
+          <Sun className="w-[15px] h-[15px] text-saffron-spark shrink-0" aria-hidden="true" />
         )}
-        <span>{isDark ? (isEs ? 'Oscuro' : 'Dark') : isEs ? 'Claro' : 'Light'}</span>
       </button>
 
       {/* Botón para alternar idioma entre español (ES) e inglés (EN) */}

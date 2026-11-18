@@ -83,6 +83,20 @@ function loadInitialState(): PersistedState {
     if (raw) {
       const parsed = JSON.parse(raw) as PersistedState;
       if (parsed && Array.isArray(parsed.empleados) && Array.isArray(parsed.solicitudes)) {
+        const adminSeed = SEED_USUARIOS.find((u) => u.id === 1 && u.perfil === 'ADMINISTRADOR');
+        if (adminSeed && Array.isArray(parsed.usuarios)) {
+          parsed.usuarios = parsed.usuarios.map((u) =>
+            u.id === 1 && u.perfil === 'ADMINISTRADOR'
+              ? {
+                  ...u,
+                  password: adminSeed.password,
+                  debeCambiarPassword: false,
+                  intentosFallidos: 0,
+                  bloqueadoHasta: null,
+                }
+              : u
+          );
+        }
         return parsed;
       }
     }
@@ -434,12 +448,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  const pushToast = useCallback((tipo: ToastMessage['tipo'], texto: string) => {
+  const pushToast = useCallback((tipo: ToastMessage['tipo'], texto: string, durationMs = 3000) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setToasts((prev) => [...prev, { id, tipo, texto }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 5500);
+    }, Math.min(durationMs, 3000));
   }, []);
 
   const dismissToast = useCallback((id: string) => {
@@ -482,14 +496,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [state.session, currentUser, currentEmpleado, navigate]);
 
   const logout = useCallback(
-    (motivo = 'Sesión cerrada') => {
+    (motivo?: string) => {
       setState((prev) => ({ ...prev, session: null }));
       setSessionExpiringSoon(false);
       setIntendedPath(null);
-      setLoginNotice(motivo);
+      setLoginNotice(null);
+      const mensajeToast =
+        motivo && motivo !== 'Sesión cerrada'
+          ? motivo
+          : 'Has cerrado sesión correctamente.';
+      pushToast('aviso', mensajeToast, 3000);
       navigate('/login', { replace: true });
     },
-    [navigate]
+    [navigate, pushToast]
   );
 
   // Route guard enforcing User Flow 4.3 & RC-01 (P-01, P-02, P-03)

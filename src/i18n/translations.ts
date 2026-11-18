@@ -107,6 +107,7 @@ export const UI_DICTIONARY_ES_TO_EN: Record<string, string> = {
   'Cuenta bloqueada temporalmente. Intente de nuevo en 15 minutos':
     'Account temporarily locked. Please try again in 15 minutes',
   'Sesión cerrada': 'Signed out',
+  'Has cerrado sesión correctamente.': 'You have signed out successfully.',
   'Su sesión va a expirar': 'Your session is about to expire',
   'Por inactividad, la sesión se cerrará automáticamente al cumplir 30 minutos. ¿Desea continuar conectado?':
     'Due to inactivity, your session will automatically close after 30 minutes. Do you want to stay signed in?',
