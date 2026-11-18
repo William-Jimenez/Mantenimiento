@@ -938,7 +938,7 @@ A continuación se detallan los 12 Requerimientos No Funcionales del sistema, in
 | **Código:** RNF-09 | **Nombre:** Diseño Responsivo y Adaptabilidad Multiplataforma |
 | **Grado de Necesidad:** Alta | **Categoría:** Portabilidad y Compatibilidad |
 | **Descripción:** | Visualización óptima en pantallas de diversa resolución y factor de forma. |
-| **Detalle Técnico Verificable:** | La interfaz de usuario será completamente funcional y libre de desbordamientos horizontales indeseados en anchos de pantalla comprendidos entre 360 píxeles (dispositivos móviles compactos) y 2560 píxeles (monitores de alta resolución). Todos los botones táctiles tendrán un área de toque mínima de 44x44 píxeles. |
+| **Detalle Técnico Verificable:** | La interfaz de usuario será completamente funcional y libre de desbordamientos horizontales indeseados en anchos de pantalla comprendidos entre 360 píxeles (dispositivos móviles compactos) y 2560 píxeles (monitores de alta resolución). El encabezado principal implementa un algoritmo de presupuesto espacial (`calcularDistribucionHeader` + `ResizeObserver`) que conmuta dinámicamente entre disposición de una fila (`single-row`), dos niveles (`two-tier` para perfiles de alta densidad como `ADMINISTRADOR` con 6 módulos de navegación) y apilado compacto (`compact-stack`), garantizando visibilidad 100% dentro del viewport. Todos los botones táctiles tendrán un área de toque mínima de 44x44 píxeles. |
 | **Efectos Colaterales:** | Diseño de layouts basados en CSS Grid y Flexbox con media queries adaptativas y reordenamiento de componentes. |
 
 | Plataforma de Mantenimiento | Requerimiento No Funcional |

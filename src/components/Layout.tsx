@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { LogoLockup } from './ConstellationCanvas';
 import { GhostButton, ModalDialog, OutlineButton, PrimaryButton } from './CommonUI';
 import { ThemeLanguageControls } from './ThemeLanguageControls';
-import { ETIQUETA_PERFIL, puedeCrearSolicitud } from '../services/domainRules';
+import {
+  calcularDistribucionHeader,
+  ETIQUETA_PERFIL,
+  HeaderLayoutAllocation,
+  HeaderLayoutInput,
+  NavLinkItem,
+  puedeCrearSolicitud,
+} from '../services/domainRules';
 
-interface NavLinkItem {
-  label: string;
-  path: string;
-  matchPrefix?: boolean;
-}
+export { calcularDistribucionHeader, type HeaderLayoutAllocation, type HeaderLayoutInput, type NavLinkItem };
 
 export function ToastFeedbackBanner() {
   const { toasts, dismissToast } = useApp();
@@ -61,35 +64,128 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     isAdmin,
     isTecnico,
     logout,
-    toasts,
-    dismissToast,
     sessionExpiringSoon,
     extendSession,
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const headerRef = useRef<HTMLElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? Math.min(1280, window.innerWidth) : 1280
+  );
 
-  const navLinks: NavLinkItem[] = isAdmin
-    ? [
-        { label: 'Inicio', path: '/' },
-        { label: 'Solicitudes', path: '/solicitudes', matchPrefix: true },
-        { label: 'Usuarios', path: '/admin/usuarios' },
-        { label: 'Empleados', path: '/admin/empleados', matchPrefix: true },
-        { label: 'Recursos', path: '/admin/recursos', matchPrefix: true },
-        { label: 'Categorías', path: '/admin/categorias' },
-      ]
-    : isTecnico
-    ? [
-        { label: 'Inicio', path: '/' },
-        { label: 'Mis Asignaciones', path: '/tecnico/solicitudes', matchPrefix: true },
-      ]
-    : [
-        { label: 'Inicio', path: '/' },
-        { label: 'Mis Solicitudes', path: '/solicitudes', matchPrefix: true },
-      ];
+  useEffect(() => {
+    const updateWidth = () => {
+      if (headerRef.current) {
+        setContainerWidth(headerRef.current.clientWidth);
+      } else if (typeof window !== 'undefined') {
+        setContainerWidth(Math.min(1280, window.innerWidth));
+      }
+    };
+
+    updateWidth();
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && headerRef.current) {
+      observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      });
+      observer.observe(headerRef.current);
+    }
+
+    window.addEventListener('resize', updateWidth);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, []);
+
+  const navLinks: NavLinkItem[] = useMemo(
+    () =>
+      isAdmin
+        ? [
+            { id: 'inicio', label: 'Inicio', path: '/', priority: 1, estimatedWidthPx: 54 },
+            {
+              id: 'solicitudes',
+              label: 'Solicitudes',
+              path: '/solicitudes',
+              priority: 1,
+              estimatedWidthPx: 98,
+              matchPrefix: true,
+            },
+            {
+              id: 'usuarios',
+              label: 'Usuarios',
+              path: '/admin/usuarios',
+              priority: 2,
+              estimatedWidthPx: 78,
+            },
+            {
+              id: 'empleados',
+              label: 'Empleados',
+              path: '/admin/empleados',
+              priority: 2,
+              estimatedWidthPx: 94,
+              matchPrefix: true,
+            },
+            {
+              id: 'recursos',
+              label: 'Recursos',
+              path: '/admin/recursos',
+              priority: 3,
+              estimatedWidthPx: 82,
+              matchPrefix: true,
+            },
+            {
+              id: 'categorias',
+              label: 'Categorías',
+              path: '/admin/categorias',
+              priority: 3,
+              estimatedWidthPx: 96,
+            },
+          ]
+        : isTecnico
+        ? [
+            { id: 'inicio', label: 'Inicio', path: '/', priority: 1, estimatedWidthPx: 54 },
+            {
+              id: 'asignaciones',
+              label: 'Mis Asignaciones',
+              path: '/tecnico/solicitudes',
+              priority: 1,
+              estimatedWidthPx: 142,
+              matchPrefix: true,
+            },
+          ]
+        : [
+            { id: 'inicio', label: 'Inicio', path: '/', priority: 1, estimatedWidthPx: 54 },
+            {
+              id: 'mis-solicitudes',
+              label: 'Mis Solicitudes',
+              path: '/solicitudes',
+              priority: 1,
+              estimatedWidthPx: 128,
+              matchPrefix: true,
+            },
+          ],
+    [isAdmin, isTecnico]
+  );
 
   const mostrarBotonNuevaSolicitud =
     puedeCrearSolicitud(currentUser) && pathname !== '/solicitudes/nueva';
+
+  const layoutAllocation = useMemo(() => {
+    const fullName = currentEmpleado
+      ? `${currentEmpleado.nombres} ${currentEmpleado.apellidos}`
+      : '';
+    return calcularDistribucionHeader({
+      containerWidth,
+      navItems: navLinks,
+      hasPrimaryCta: mostrarBotonNuevaSolicitud,
+      userDisplayLength: fullName.length,
+    });
+  }, [containerWidth, navLinks, mostrarBotonNuevaSolicitud, currentEmpleado]);
 
   const isLinkActive = (item: NavLinkItem) => {
     if (item.path === '/') return pathname === '/';
@@ -111,90 +207,156 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-void text-bone-white flex flex-col">
-      {/* Top Navigation Bar — 3-zone contract */}
+      {/* Adaptive Top Navigation Header — Zero-Overflow Spatial Budget Layout */}
       {currentUser && currentEmpleado && !currentUser.debeCambiarPassword && (
-        <header className="w-full bg-void border-b border-white/10">
-          <div className="max-w-[1280px] mx-auto px-[18px] sm:px-[30px] h-[76px] flex items-center justify-between gap-4 sm:gap-8">
-            {/* Zone 1: Brand wordmark */}
-            <LogoLockup onClick={() => handleNavClick('/')} />
+        <header
+          ref={headerRef}
+          data-layout-mode={layoutAllocation.mode}
+          className="w-full bg-void border-b border-white/10"
+        >
+          <div className="max-w-[1280px] w-full mx-auto px-[18px] sm:px-[30px]">
+            {/* Row 1: Brand + (Inline Nav when single-row fits) + Utility/Session/CTA */}
+            <div className="min-h-[68px] py-[10px] flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[10px]">
+              {/* Zone 1: Brand wordmark */}
+              <LogoLockup onClick={() => handleNavClick('/')} />
 
-            {/* Zone 2: Single-line nav links (desktop) */}
-            <nav aria-label="Navegación principal" className="hidden lg:flex items-center gap-[24px]">
-              {navLinks.map((item) => {
-                const active = isLinkActive(item);
-                return (
-                  <button
-                    key={item.path}
-                    type="button"
-                    onClick={() => handleNavClick(item.path)}
-                    className={`nav-label whitespace-nowrap shrink-0 py-[6px] cursor-pointer transition-colors ${
-                      active
-                        ? 'text-bone-white border-b border-electric-iris'
-                        : 'text-ash-gray hover:text-bone-white'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Zone 3: Theme & Language Controls + User session + Primary CTA */}
-            <div className="flex items-center gap-[12px] sm:gap-[16px] shrink-0">
-              <ThemeLanguageControls />
-
-              <div className="hidden md:flex items-center gap-[12px] text-[14px]">
-                <span className="text-silver-mist whitespace-nowrap">
-                  {currentEmpleado.nombres} {currentEmpleado.apellidos}
-                </span>
-                <span className="px-[10px] py-[2px] rounded-full border border-white/15 text-[11px] uppercase tracking-[0.35px] text-saffron-spark">
-                  {ETIQUETA_PERFIL[currentUser.perfil]}
-                </span>
-                <span aria-hidden="true" className="text-ash-gray">·</span>
-                <GhostButton onClick={() => logout()}>
-                  Cerrar sesión
-                </GhostButton>
-              </div>
-
-              {mostrarBotonNuevaSolicitud && (
-                <PrimaryButton
-                  onClick={() => handleNavClick('/solicitudes/nueva')}
-                  className="hidden sm:inline-flex"
+              {/* Zone 2 (Single-Row Mode only): Inline navigation when spatial budget allows */}
+              {layoutAllocation.mode === 'single-row' && (
+                <nav
+                  aria-label="Navegación principal"
+                  className="flex items-center flex-wrap"
+                  style={{ gap: `${layoutAllocation.navGapPx}px` }}
                 >
-                  Nueva solicitud
-                </PrimaryButton>
+                  {navLinks.map((item) => {
+                    const active = isLinkActive(item);
+                    return (
+                      <button
+                        key={item.path}
+                        type="button"
+                        onClick={() => handleNavClick(item.path)}
+                        className={`nav-label whitespace-nowrap shrink-0 py-[6px] cursor-pointer transition-colors ${
+                          active
+                            ? 'text-bone-white border-b-2 border-electric-iris'
+                            : 'text-ash-gray hover:text-bone-white'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </nav>
               )}
 
-              <button
-                type="button"
-                aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
-                aria-expanded={mobileMenuOpen}
-                onClick={() => setMobileMenuOpen((v) => !v)}
-                className="lg:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-bone-white cursor-pointer"
-              >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
+              {/* Zone 3: Theme & Language Controls + User session + Primary CTA */}
+              <div className="flex flex-wrap items-center justify-end gap-[10px] sm:gap-[14px] ml-auto">
+                <ThemeLanguageControls />
+
+                <div className="hidden sm:flex items-center gap-[10px] text-[13px] sm:text-[14px]">
+                  <span className="text-silver-mist whitespace-nowrap max-w-[180px] truncate">
+                    {currentEmpleado.nombres} {currentEmpleado.apellidos}
+                  </span>
+                  <span className="px-[10px] py-[2px] rounded-full border border-white/15 text-[11px] uppercase tracking-[0.35px] text-saffron-spark whitespace-nowrap">
+                    {ETIQUETA_PERFIL[currentUser.perfil]}
+                  </span>
+                  <span aria-hidden="true" className="text-ash-gray">
+                    ·
+                  </span>
+                  <GhostButton onClick={() => logout()}>Cerrar sesión</GhostButton>
+                </div>
+
+                {mostrarBotonNuevaSolicitud && (
+                  <PrimaryButton
+                    onClick={() => handleNavClick('/solicitudes/nueva')}
+                    className="hidden sm:inline-flex !px-[16px] !py-[9px] !min-h-[38px] !text-[13px]"
+                  >
+                    Nueva solicitud
+                  </PrimaryButton>
+                )}
+
+                <button
+                  type="button"
+                  aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+                  aria-expanded={mobileMenuOpen}
+                  onClick={() => setMobileMenuOpen((v) => !v)}
+                  className="sm:hidden p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-bone-white cursor-pointer"
+                >
+                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
+
+            {/* Row 2 (Two-Tier & Compact Mode): Full visible navigation bar inside viewport */}
+            {layoutAllocation.mode !== 'single-row' && (
+              <div className="border-t border-white/8 py-[8px] flex flex-wrap items-center justify-between gap-x-[16px] gap-y-[8px]">
+                <nav
+                  aria-label="Navegación principal"
+                  className="flex flex-wrap items-center gap-x-[16px] sm:gap-x-[22px] gap-y-[6px]"
+                >
+                  {navLinks.map((item) => {
+                    const active = isLinkActive(item);
+                    return (
+                      <button
+                        key={item.path}
+                        type="button"
+                        onClick={() => handleNavClick(item.path)}
+                        className={`nav-label whitespace-nowrap shrink-0 py-[4px] cursor-pointer transition-colors ${
+                          active
+                            ? 'text-bone-white border-b-2 border-electric-iris'
+                            : 'text-ash-gray hover:text-bone-white'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+
+                {/* On ultra-compact screens (< 640px), also keep session & CTA accessible in Row 2 */}
+                <div className="flex sm:hidden flex-wrap items-center justify-between w-full pt-[6px] border-t border-white/8 gap-[10px] text-[12px]">
+                  <div className="flex items-center gap-[8px]">
+                    <span className="text-silver-mist truncate max-w-[150px]">
+                      {currentEmpleado.nombres} {currentEmpleado.apellidos}
+                    </span>
+                    <span className="px-[8px] py-[1px] rounded-full border border-white/15 text-[10px] uppercase text-saffron-spark">
+                      {ETIQUETA_PERFIL[currentUser.perfil]}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-[10px]">
+                    {mostrarBotonNuevaSolicitud && (
+                      <button
+                        type="button"
+                        onClick={() => handleNavClick('/solicitudes/nueva')}
+                        className="px-[12px] py-[5px] rounded-full bg-electric-iris text-bone-white text-[11px] font-semibold uppercase tracking-[0.35px] cursor-pointer"
+                      >
+                        + Nueva solicitud
+                      </button>
+                    )}
+                    <GhostButton onClick={() => logout()} className="!min-h-[28px] !text-[12px]">
+                      Cerrar sesión
+                    </GhostButton>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Mobile Drawer (< 1024px, usable down to 360px per RNF-03) */}
+          {/* Optional Mobile Drawer when hamburger button is toggled on < 640px */}
           {mobileMenuOpen && (
-            <div className="lg:hidden border-t border-white/12 px-[18px] py-[24px] space-y-[18px] bg-void">
-              <div className="flex items-center justify-between text-[14px] pb-[12px] border-b border-white/10">
+            <div className="sm:hidden border-t border-white/12 px-[18px] py-[18px] space-y-[14px] bg-void">
+              <div className="flex items-center justify-between text-[13px] pb-[10px] border-b border-white/10">
                 <span className="text-silver-mist">
-                  {currentEmpleado.nombres} {currentEmpleado.apellidos} ({ETIQUETA_PERFIL[currentUser.perfil]})
+                  {currentEmpleado.nombres} {currentEmpleado.apellidos} (
+                  {ETIQUETA_PERFIL[currentUser.perfil]})
                 </span>
-                <GhostButton onClick={() => logout()}>
-                  Cerrar sesión
-                </GhostButton>
+                <GhostButton onClick={() => logout()}>Cerrar sesión</GhostButton>
               </div>
-              <nav aria-label="Navegación móvil" className="flex flex-col gap-[12px]">
+              <nav aria-label="Navegación móvil" className="flex flex-col gap-[10px]">
                 {navLinks.map((item) => (
                   <button
                     key={item.path}
                     type="button"
                     onClick={() => handleNavClick(item.path)}
-                    className={`text-left nav-label py-[8px] cursor-pointer ${
+                    className={`text-left nav-label py-[6px] cursor-pointer ${
                       isLinkActive(item) ? 'text-bone-white' : 'text-ash-gray'
                     }`}
                   >
@@ -202,16 +364,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   </button>
                 ))}
               </nav>
-              {mostrarBotonNuevaSolicitud && (
-                <div className="pt-[6px]">
-                  <PrimaryButton
-                    onClick={() => handleNavClick('/solicitudes/nueva')}
-                    className="w-full"
-                  >
-                    Nueva solicitud
-                  </PrimaryButton>
-                </div>
-              )}
             </div>
           )}
         </header>

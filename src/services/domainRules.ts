@@ -384,6 +384,85 @@ export function generarCodigoSolicitud(secuencia: number, year = 2026): string {
   return `SM-${year}-${String(secuencia).padStart(6, '0')}`;
 }
 
+export interface NavLinkItem {
+  id: string;
+  label: string;
+  path: string;
+  priority: number;
+  estimatedWidthPx: number;
+  matchPrefix?: boolean;
+}
+
+export interface HeaderLayoutInput {
+  containerWidth: number;
+  navItems: NavLinkItem[];
+  hasPrimaryCta: boolean;
+  userDisplayLength: number;
+}
+
+export interface HeaderLayoutAllocation {
+  mode: 'single-row' | 'two-tier' | 'compact-stack';
+  navGapPx: number;
+  compactUserSession: boolean;
+  totalEstimatedSingleRowPx: number;
+  availableWidthPx: number;
+}
+
+/**
+ * Algoritmo determinista de presupuesto espacial para el encabezado (Spatial Budget Allocation):
+ * Calcula el ancho requerido por las 3 zonas (Marca + Navegación + Controles/Sesión/CTA)
+ * y determina el modo óptimo de disposición ('single-row', 'two-tier' o 'compact-stack')
+ * para garantizar que todos los elementos sean 100% visibles y accesibles dentro del viewport
+ * sin desbordamiento horizontal en cualquier resolución.
+ */
+export function calcularDistribucionHeader(input: HeaderLayoutInput): HeaderLayoutAllocation {
+  const { containerWidth, navItems, hasPrimaryCta, userDisplayLength } = input;
+  const horizontalPadding = containerWidth < 640 ? 36 : 60;
+  const availableWidthPx = Math.max(320, containerWidth - horizontalPadding);
+
+  const brandWidth = 165;
+  const controlsWidth = 120;
+  const userSessionWidth = Math.min(340, Math.max(200, userDisplayLength * 7.5 + 145));
+  const ctaWidth = hasPrimaryCta ? 175 : 0;
+
+  const navGapPx = availableWidthPx >= 1200 ? 22 : 16;
+  const navItemsWidth =
+    navItems.reduce((sum, item) => sum + item.estimatedWidthPx, 0) +
+    Math.max(0, navItems.length - 1) * navGapPx;
+
+  const zoneGaps = 48;
+  const totalEstimatedSingleRowPx =
+    brandWidth + navItemsWidth + controlsWidth + userSessionWidth + ctaWidth + zoneGaps;
+
+  if (availableWidthPx < 680) {
+    return {
+      mode: 'compact-stack',
+      navGapPx: 12,
+      compactUserSession: true,
+      totalEstimatedSingleRowPx,
+      availableWidthPx,
+    };
+  }
+
+  if (totalEstimatedSingleRowPx <= availableWidthPx) {
+    return {
+      mode: 'single-row',
+      navGapPx,
+      compactUserSession: false,
+      totalEstimatedSingleRowPx,
+      availableWidthPx,
+    };
+  }
+
+  return {
+    mode: 'two-tier',
+    navGapPx: 20,
+    compactUserSession: availableWidthPx < 900,
+    totalEstimatedSingleRowPx,
+    availableWidthPx,
+  };
+}
+
 export {
   esPasswordHasheada,
   hashPassword,
