@@ -1,0 +1,894 @@
+{
+  "info": {
+    "_postman_id": "a7b9f8c2-3d1e-4b5a-9c8d-1f2e3a4b5c6d",
+    "name": "Solicitudes de Mantenimiento - Spring Boot + PostgreSQL + JWT",
+    "description": "Colección oficial de Postman para probar la API REST desarrollada en Spring Boot 3.4 con PostgreSQL 16, JPA/Hibernate y Spring Security (JWT + RBAC: ADMINISTRADOR, EMPLEADO, CLIENTE).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tecnico_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cliente_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "solicitud_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "reset_code",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Salud y Catálogos",
+      "item": [
+        {
+          "name": "Health Check API",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Servicio Spring Boot activo', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql('UP');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "health"]
+            }
+          }
+        },
+        {
+          "name": "Obtener Catálogos Maestros",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado HTTP 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Incluye estados, categorías, prioridades y técnicos', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('estados');",
+                  "    pm.expect(json).to.have.property('categorias');",
+                  "    pm.expect(json).to.have.property('prioridades');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/catalogos",
+              "host": ["{{base_url}}"],
+              "path": ["api", "catalogos"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Autenticación y Roles (JWT)",
+      "item": [
+        {
+          "name": "Login Administrador (Guarda Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login Administrador exitoso (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.token) {",
+                  "    pm.collectionVariables.set('admin_token', json.token);",
+                  "    pm.collectionVariables.set('jwt_token', json.token);",
+                  "    pm.environment.set('jwt_token', json.token);",
+                  "}",
+                  "pm.test('Rol es ADMINISTRADOR', function () {",
+                  "    pm.expect(json.usuario.perfil).to.eql('ADMINISTRADOR');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin@empresa.com\",\n  \"password\": \"admin12345\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Empleado Técnico (Guarda Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login Empleado Técnico exitoso (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.token) {",
+                  "    pm.collectionVariables.set('tecnico_token', json.token);",
+                  "    pm.collectionVariables.set('jwt_token', json.token);",
+                  "}",
+                  "pm.test('Rol es EMPLEADO', function () {",
+                  "    pm.expect(json.usuario.perfil).to.eql('EMPLEADO');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"carlos.mendez@empresa.com\",\n  \"password\": \"Tecnico123*\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Cliente Solicitante (Guarda Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login Cliente exitoso (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var json = pm.response.json();",
+                  "if (json.token) {",
+                  "    pm.collectionVariables.set('cliente_token', json.token);",
+                  "    pm.collectionVariables.set('jwt_token', json.token);",
+                  "}",
+                  "pm.test('Rol es CLIENTE', function () {",
+                  "    pm.expect(json.usuario.perfil).to.eql('CLIENTE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"ana.gomez@empresa.com\",\n  \"password\": \"Cliente123*\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Registro de Nuevo Cliente (201 Created)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Usuario registrado con éxito (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test('Retorna token JWT y rol CLIENTE', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.token).to.be.a('string');",
+                  "    pm.expect(json.usuario.perfil).to.eql('CLIENTE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documento\": \"1098765432\",\n  \"nombres\": \"Pedro\",\n  \"apellidos\": \"Ramírez\",\n  \"correo\": \"pedro.ramirez@empresa.com\",\n  \"cargo\": \"Coordinador de Logística\",\n  \"password\": \"Segura2026*\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Consultar Perfil Autenticado (/api/auth/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Retorna perfil del usuario actual (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Recuperación de Contraseña - Paso 1 (Enviar Código)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Código enviado (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    if (json.codigoSimulado) {",
+                  "        pm.collectionVariables.set('reset_code', json.codigoSimulado);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"ana.gomez@empresa.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/password-reset/request",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "password-reset", "request"]
+            }
+          }
+        },
+        {
+          "name": "Recuperación de Contraseña - Paso 2 (Confirmar Código)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Contraseña restablecida (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"ana.gomez@empresa.com\",\n  \"codigo\": \"{{reset_code}}\",\n  \"nuevaPassword\": \"Cliente123*\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/password-reset/confirm",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "password-reset", "confirm"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. CRUD de Solicitudes de Mantenimiento",
+      "item": [
+        {
+          "name": "Listar Solicitudes (GET /api/solicitudes)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Listado de solicitudes obtenido (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes"]
+            }
+          }
+        },
+        {
+          "name": "Crear Nueva Solicitud (POST /api/solicitudes)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Solicitud creada con estado Pendiente (201)', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql('Pendiente');",
+                  "    pm.collectionVariables.set('solicitud_id', json.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recursoId\": 1,\n  \"descripcion\": \"El servidor presenta reinicios inesperados durante picos de carga y alerta de temperatura en fuente redundante.\",\n  \"categoriaId\": 5,\n  \"prioridadId\": 3\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes"]
+            }
+          }
+        },
+        {
+          "name": "Obtener Detalle de Solicitud por ID (GET /api/solicitudes/:id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Detalle de solicitud retornado (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('codigo');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Actualizar Solicitud (PUT /api/solicitudes/:id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Solicitud actualizada correctamente (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recursoId\": 1,\n  \"descripcion\": \"El servidor presenta reinicios inesperados durante picos de carga, alerta térmica en fuente #2 y ventilador trasero detenido.\",\n  \"categoriaId\": 5,\n  \"prioridadId\": 4\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Asignar Técnico a Solicitud (PATCH /api/solicitudes/:id/asignar)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Técnico asignado y estado pasa a Asignada (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql('Asignada');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tecnicoId\": 2,\n  \"categoriaId\": 5,\n  \"prioridadId\": 3,\n  \"motivoReasignacion\": \"Asignación a especialista electromecánico\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/asignar",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "asignar"]
+            }
+          }
+        },
+        {
+          "name": "Cambiar Estado a En Proceso (PATCH /api/solicitudes/:id/estado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado actualizado a En proceso (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql('En proceso');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tecnico_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nuevoEstado\": \"En proceso\",\n  \"motivo\": \"Iniciando diagnóstico de fuente redundante en centro de datos\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/estado",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "estado"]
+            }
+          }
+        },
+        {
+          "name": "Finalizar Solicitud con Trabajo Realizado (PATCH /api/solicitudes/:id/estado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Estado actualizado a Finalizada (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.estado).to.eql('Finalizada');",
+                  "    pm.expect(json.estadoEsFinal).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tecnico_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nuevoEstado\": \"Finalizada\",\n  \"trabajoRealizado\": \"Se reemplazó módulo de ventilación trasero y fuente redundante #2; pruebas de estrés superadas sin alertas térmicas.\",\n  \"motivo\": \"Mantenimiento correctivo finalizado satisfactoriamente\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/estado",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "estado"]
+            }
+          }
+        },
+        {
+          "name": "Consultar Historial Forense de Solicitud (GET /api/solicitudes/:id/historial)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Historial de estados retornado (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}/historial",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}", "historial"]
+            }
+          }
+        },
+        {
+          "name": "Eliminar Solicitud (DELETE /api/solicitudes/:id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Solicitud eliminada por Administrador (200)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/solicitudes/{{solicitud_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "solicitudes", "{{solicitud_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Recursos, Usuarios y Pruebas RBAC (403)",
+      "item": [
+        {
+          "name": "Listar Recursos Físicos (GET /api/recursos)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/recursos",
+              "host": ["{{base_url}}"],
+              "path": ["api", "recursos"]
+            }
+          }
+        },
+        {
+          "name": "Crear Recurso Físico (POST /api/recursos - Solo ADMIN)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"EQ-TI-0099\",\n  \"nombre\": \"Switch Core Cisco Catalyst 9300\",\n  \"tipoRecursoId\": 1,\n  \"ubicacion\": \"Rack Principal - Piso 2\",\n  \"descripcion\": \"Switch capa 3 de 48 puertos PoE+\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/recursos",
+              "host": ["{{base_url}}"],
+              "path": ["api", "recursos"]
+            }
+          }
+        },
+        {
+          "name": "Listar Usuarios (GET /api/usuarios - Solo ADMIN)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/usuarios",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios"]
+            }
+          }
+        },
+        {
+          "name": "Prueba RBAC: Cliente intenta listar usuarios (Retorna 403 Forbidden)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Acceso bloqueado con HTTP 403 Forbidden', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{cliente_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/usuarios",
+              "host": ["{{base_url}}"],
+              "path": ["api", "usuarios"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

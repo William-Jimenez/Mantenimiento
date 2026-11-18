@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mantenimiento_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-mantenimiento_db}
+      POSTGRES_USER: ${DB_USER:-mantenimiento_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mantenimiento_pass}
+      TZ: UTC
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/sql/schema-postgresql.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-mantenimiento_user} -d ${DB_NAME:-mantenimiento_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend-springboot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mantenimiento_springboot_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-mantenimiento_db}
+      DB_USER: ${DB_USER:-mantenimiento_user}
+      DB_PASSWORD: ${DB_PASSWORD:-mantenimiento_pass}
+      JWT_SECRET: ${JWT_SECRET:-MantenimientoJwtSecretKey2026SuperSecureMinimum32BytesLongKey!}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+volumes:
+  postgres_data:

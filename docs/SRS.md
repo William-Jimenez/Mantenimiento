@@ -220,7 +220,7 @@ La incorporación de un motor de análisis multimodal basado en Inteligencia Art
 
 ### 2.1 Perspectiva del Producto y Arquitectura de Alto Nivel
 
-El producto opera como un sistema web corporativo alojado en infraestructura centralizada (servidor empresarial en la nube o VPS corporativo). Su arquitectura responde al patrón de **Monolito Modular en Capas**, permitiendo que todos los componentes de negocio (M1 a M6) compartan un modelo de dominio unificado y una única base de datos relacional transaccional (MySQL 8.4 LTS), desacoplando a su vez el servicio de análisis de IA como un ejecutor de tareas asíncronas no bloqueantes.
+El producto opera como un sistema web corporativo alojado en infraestructura centralizada (servidor empresarial en la nube o VPS corporativo). Su arquitectura responde al patrón de **Monolito Modular en Capas** implementado sobre **Spring Boot 3.4 (Java 21)** en `/backend` con **Spring Data JPA (Hibernate)** y **Spring Security (JWT + BCrypt)**, permitiendo que todos los componentes de negocio (M1 a M6) compartan un modelo de dominio unificado y una única base de datos relacional transaccional (**PostgreSQL 16** / compatible con MySQL 8.4 LTS), desacoplando a su vez el servicio de análisis de IA como un ejecutor de tareas asíncronas no bloqueantes.
 
 ```mermaid
 flowchart TD
@@ -229,12 +229,12 @@ flowchart TD
         UIState["Gestor de Estado y Validación Local"]
     end
 
-    subgraph CapaSeguridad["Capa de Seguridad"]
-        AuthFilter["Filtro de Autenticación (BCrypt / Sesiones)"]
+    subgraph CapaSeguridad["Capa de Seguridad (Spring Security + JWT)"]
+        AuthFilter["Filtro de Autenticación (JWT Bearer + BCrypt)"]
         RBAC["Controlador de Acceso Basado en Roles (RBAC)"]
     end
 
-    subgraph CapaServicio["Capa de Negocio y Aplicación"]
+    subgraph CapaServicio["Capa de Negocio y Aplicación (Spring Boot REST)"]
         M1["M1: Servicio de Usuarios y Empleados"]
         M2["M2: Servicio de Catálogo de Recursos"]
         M3["M3: Servicio de Solicitudes y Evidencias"]
@@ -244,7 +244,7 @@ flowchart TD
     end
 
     subgraph CapaDatos["Capa de Persistencia y Almacenamiento"]
-        DB[(Base de Datos Relacional MySQL 8.4)]
+        DB[(Base de Datos Relacional PostgreSQL 16)]
         FileStore["Almacén de Archivos Seguro (Fotos / PDF)"]
     end
 

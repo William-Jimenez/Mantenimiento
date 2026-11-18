@@ -2,9 +2,9 @@
 
 **PROYECTO:** PLATAFORMA DE GESTIÓN INTEGRAL DE SOLICITUDES DE MANTENIMIENTO CON ANÁLISIS ASISTIDO POR IA  
 **DOCUMENTO:** Modelo Entidad-Relación y Especificación de Persistencia Relacional  
-**VERSIÓN:** 1.1  
-**FECHA DE EMISIÓN:** 14 de noviembre de 2026  
-**MOTOR DE BASE DE DATOS:** MySQL 8.4 LTS (Motor Transaccional InnoDB)  
+**VERSIÓN:** 1.2  
+**FECHA DE EMISIÓN:** 18 de noviembre de 2026  
+**MOTOR DE BASE DE DATOS:** PostgreSQL 16 (`backend/sql/schema-postgresql.sql` + JPA/Hibernate en Spring Boot) / Compatible MySQL 8.4 LTS  
 **ESTADO:** Aprobado para Fase de Construcción y Aseguramiento de Calidad (QA)  
 
 ---

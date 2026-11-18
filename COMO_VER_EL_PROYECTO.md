@@ -6,10 +6,10 @@ Este documento detalla paso a paso el proceso para instalar, configurar y levant
 
 ## 1. Tecnologías del Proyecto
 
-* **Lenguaje:** TypeScript / JavaScript (ES Modules)
-* **Librería UI:** React 19
-* **Empaquetador y Servidor de Desarrollo:** Vite 8
-* **Estilos:** Tailwind CSS v4
+* **Frontend:** TypeScript / JavaScript (ES Modules), React 19, Vite 8, Tailwind CSS v4
+* **Backend Spring Boot (`/backend`):** Java 21, Spring Boot 3.4, Spring Data JPA (Hibernate), Spring Security + JWT (Bearer Token) + BCrypt
+* **Base de Datos Relacional:** PostgreSQL 16 (`docker-compose.yml` y `backend/sql/schema-postgresql.sql`)
+* **Pruebas de API:** Colección y entorno Postman (`postman/`) y Suite QA con Jules (`tests/rbac.test.ts`)
 * **Librerías adicionales:** Motion (animaciones), Lucide React (iconos), Google GenAI SDK
 
 ---
@@ -163,3 +163,36 @@ Abre tu navegador web preferido (Chrome, Edge, Firefox, etc.) e ingresa a `http:
 ### 4. Advertencia sobre `__dirname` al compilar
 * **Síntoma:** `(!) Your Vite config uses features that are unsupported by configLoader: 'native'`.
 * **Explicación:** Se debe al uso de `__dirname` en `vite.config.ts`. Es meramente un aviso informativo de compatibilidad futura en Vite y no impide el funcionamiento ni el empaquetado del proyecto.
+
+---
+
+## 8. Ejecución del Backend Spring Boot + PostgreSQL y Pruebas en Postman
+
+### 1. Levantar PostgreSQL y Spring Boot con Docker Compose
+En la raíz del proyecto se incluye `docker-compose.yml`, el cual levanta PostgreSQL 16 (puerto `5432`) e inicializa el esquema `backend/sql/schema-postgresql.sql`, junto con el contenedor de la API Spring Boot (puerto `8080`):
+
+```powershell
+# Levantar únicamente la base de datos PostgreSQL 16
+docker compose up -d postgres
+
+# O levantar PostgreSQL + API Spring Boot completa en contenedores
+docker compose up -d --build
+```
+
+### 2. Ejecutar Spring Boot localmente con Maven (si tienes JDK 21 instalado)
+```powershell
+cd backend
+# Conectado a PostgreSQL (perfil por defecto configurado en application.yml)
+mvn spring-boot:run
+
+# O usando el perfil local/test en memoria (sin requerir motor externo activo)
+mvn spring-boot:run "-Dspring-boot.run.profiles=test"
+```
+
+### 3. Probar los Endpoints en Postman
+1. Abre **Postman** y haz clic en **Import**.
+2. Importa los dos archivos ubicados en la carpeta `postman/`:
+   * `postman/Solicitudes_Mantenimiento_SpringBoot.postman_collection.json`
+   * `postman/Solicitudes_Mantenimiento_Local.postman_environment.json`
+3. Selecciona el entorno **Solicitudes Mantenimiento - Local (Spring Boot 8080)**.
+4. Ejecuta primero **2. Autenticación y Roles (JWT) -> Login Administrador (Guarda Token)**. El script de Postman guardará automáticamente el token JWT en `{{jwt_token}}` y `{{admin_token}}` para probar todo el CRUD de solicitudes (`/api/solicitudes`), recursos (`/api/recursos`) y usuarios (`/api/usuarios`).

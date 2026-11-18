@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import http from 'node:http';
+import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { SEED_ASIGNACIONES, SEED_EMPLEADOS, SEED_SOLICITUDES, SEED_USUARIOS } from '../src/data/seed';
 import { createApiApp, createInitialBackendStore, encodeSessionToken } from '../src/server/apiApp';
@@ -635,5 +637,90 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
     });
     assert.equal(allocAdmin1280.mode, 'single-row');
     assert.equal(allocAdmin1280.totalEstimatedSingleRowPx <= allocAdmin1280.availableWidthPx, true);
+  });
+
+  // ==========================================================================
+  // 8. Pruebas de Arquitectura Spring Boot, PostgreSQL, Entidades JPA, JWT, CRUD y Postman
+  // ==========================================================================
+  it('verifica la estructura completa del backend Spring Boot, configuración PostgreSQL, 12 entidades JPA, seguridad JWT, CRUD REST y colección Postman', () => {
+    const rootDir = process.cwd();
+
+    // 1. Proyecto Spring Boot (pom.xml y clase principal)
+    const pomXml = fs.readFileSync(path.join(rootDir, 'backend', 'pom.xml'), 'utf8');
+    assert.match(pomXml, /spring-boot-starter-web/);
+    assert.match(pomXml, /spring-boot-starter-data-jpa/);
+    assert.match(pomXml, /spring-boot-starter-security/);
+    assert.match(pomXml, /org\.postgresql/);
+    assert.match(pomXml, /jjwt-api/);
+
+    // 2. Configuración PostgreSQL (application.yml, docker-compose.yml y schema-postgresql.sql)
+    const appYml = fs.readFileSync(path.join(rootDir, 'backend', 'src', 'main', 'resources', 'application.yml'), 'utf8');
+    assert.match(appYml, /jdbc:postgresql:/);
+    assert.match(appYml, /org\.postgresql\.Driver/);
+    assert.match(appYml, /PostgreSQLDialect/);
+
+    const dockerCompose = fs.readFileSync(path.join(rootDir, 'docker-compose.yml'), 'utf8');
+    assert.match(dockerCompose, /postgres:16-alpine/);
+
+    const pgSchema = fs.readFileSync(path.join(rootDir, 'backend', 'sql', 'schema-postgresql.sql'), 'utf8');
+    assert.match(pgSchema, /CREATE UNIQUE INDEX IF NOT EXISTS uq_asignacion_vigente ON asignacion/);
+
+    // 3. Las 12 Entidades JPA y relaciones (@Entity, @ManyToOne, @OneToMany, @OneToOne, @Version)
+    const entityDir = path.join(rootDir, 'backend', 'src', 'main', 'java', 'com', 'mantenimiento', 'domain', 'entity');
+    const expectedEntities = [
+      'Empleado.java',
+      'Usuario.java',
+      'TipoRecurso.java',
+      'Recurso.java',
+      'Categoria.java',
+      'Prioridad.java',
+      'Estado.java',
+      'Solicitud.java',
+      'Evidencia.java',
+      'Asignacion.java',
+      'AnalisisIA.java',
+      'HistorialEstado.java',
+    ];
+    for (const entityFile of expectedEntities) {
+      const content = fs.readFileSync(path.join(entityDir, entityFile), 'utf8');
+      assert.match(content, /@Entity/);
+      assert.match(content, /@Table/);
+    }
+    const solicitudEntity = fs.readFileSync(path.join(entityDir, 'Solicitud.java'), 'utf8');
+    assert.match(solicitudEntity, /@ManyToOne/);
+    assert.match(solicitudEntity, /@OneToMany/);
+    assert.match(solicitudEntity, /@Version/);
+
+    // 4. Autenticación y Roles con Spring Security + JWT + BCrypt
+    const securityDir = path.join(rootDir, 'backend', 'src', 'main', 'java', 'com', 'mantenimiento', 'security');
+    const securityConfig = fs.readFileSync(path.join(securityDir, 'SecurityConfig.java'), 'utf8');
+    assert.match(securityConfig, /BCryptPasswordEncoder/);
+    assert.match(securityConfig, /SessionCreationPolicy\.STATELESS/);
+    assert.match(securityConfig, /hasRole\("ADMINISTRADOR"\)/);
+
+    const jwtService = fs.readFileSync(path.join(securityDir, 'JwtService.java'), 'utf8');
+    assert.match(jwtService, /Jwts\.builder\(\)/);
+
+    // 5. API REST y CRUD completo de Solicitudes
+    const controllerDir = path.join(rootDir, 'backend', 'src', 'main', 'java', 'com', 'mantenimiento', 'controller');
+    const solicitudController = fs.readFileSync(path.join(controllerDir, 'SolicitudController.java'), 'utf8');
+    assert.match(solicitudController, /@RestController/);
+    assert.match(solicitudController, /@RequestMapping\("\/api\/solicitudes"\)/);
+    assert.match(solicitudController, /@GetMapping/);
+    assert.match(solicitudController, /@PostMapping/);
+    assert.match(solicitudController, /@PutMapping\("\/\{id\}"\)/);
+    assert.match(solicitudController, /@PatchMapping\("\/\{id\}\/asignar"\)/);
+    assert.match(solicitudController, /@PatchMapping\("\/\{id\}\/estado"\)/);
+    assert.match(solicitudController, /@DeleteMapping\("\/\{id\}"\)/);
+
+    // 6. Colección y Entorno de Postman para probar todos los endpoints
+    const postmanCollectionRaw = fs.readFileSync(
+      path.join(rootDir, 'postman', 'Solicitudes_Mantenimiento_SpringBoot.postman_collection.json'),
+      'utf8'
+    );
+    const postmanCollection = JSON.parse(postmanCollectionRaw);
+    assert.equal(postmanCollection.info.name.includes('Spring Boot'), true);
+    assert.equal(Array.isArray(postmanCollection.item), true);
+    assert.equal(postmanCollection.item.length, 4);
   });
 });
