@@ -3,6 +3,7 @@ import { Menu, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { LogoLockup } from './ConstellationCanvas';
 import { GhostButton, ModalDialog, OutlineButton, PrimaryButton } from './CommonUI';
+import { ThemeLanguageControls } from './ThemeLanguageControls';
 import { ETIQUETA_PERFIL, puedeCrearSolicitud } from '../services/domainRules';
 
 interface NavLinkItem {
@@ -98,8 +99,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               })}
             </nav>
 
-            {/* Zone 3: User session + Primary CTA */}
-            <div className="flex items-center gap-[18px] shrink-0">
+            {/* Zone 3: Theme & Language Controls + User session + Primary CTA */}
+            <div className="flex items-center gap-[12px] sm:gap-[16px] shrink-0">
+              <ThemeLanguageControls />
+
               <div className="hidden md:flex items-center gap-[12px] text-[14px]">
                 <span className="text-silver-mist whitespace-nowrap">
                   {currentEmpleado.nombres} {currentEmpleado.apellidos}

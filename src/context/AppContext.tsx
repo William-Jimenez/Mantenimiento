@@ -48,6 +48,14 @@ import {
   validarPoliticaPassword,
   verifyPassword,
 } from '../services/domainRules';
+import {
+  applyLanguageToDOM,
+  LANG_STORAGE_KEY,
+  Language,
+  THEME_STORAGE_KEY,
+  ThemeMode,
+  translateText,
+} from '../i18n/translations';
 
 const STORAGE_KEY = 'plataforma_mantenimiento_v2';
 const INACTIVITY_WARNING_MS = 28 * 60 * 1000;
@@ -125,6 +133,15 @@ interface AppContextValue {
   toasts: ToastMessage[];
   pushToast: (tipo: ToastMessage['tipo'], texto: string) => void;
   dismissToast: (id: string) => void;
+
+  // Theme & Language (Dark/Light, ES/EN)
+  theme: ThemeMode;
+  setTheme: (theme: ThemeMode) => void;
+  toggleTheme: () => void;
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  toggleLanguage: () => void;
+  t: (text: string) => string;
 
   // Data collections
   empleados: Empleado[];
@@ -285,6 +302,103 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     estados: [],
     page: 0,
   });
+
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'light' || saved === 'dark') return saved;
+    } catch {
+      // ignore
+    }
+    return 'dark';
+  });
+
+  const [language, setLanguageState] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem(LANG_STORAGE_KEY);
+      if (saved === 'en' || saved === 'es') return saved;
+    } catch {
+      // ignore
+    }
+    return 'es';
+  });
+
+  const setTheme = useCallback((nextTheme: ThemeMode) => {
+    setThemeState(nextTheme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const next: ThemeMode = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, next);
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  const setLanguage = useCallback((nextLang: Language) => {
+    setLanguageState(nextLang);
+    try {
+      localStorage.setItem(LANG_STORAGE_KEY, nextLang);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleLanguage = useCallback(() => {
+    setLanguageState((prev) => {
+      const next: Language = prev === 'es' ? 'en' : 'es';
+      try {
+        localStorage.setItem(LANG_STORAGE_KEY, next);
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  const t = useCallback((text: string) => translateText(text, language), [language]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const html = document.documentElement;
+    html.setAttribute('data-theme', theme);
+    html.classList.remove('theme-dark', 'theme-light', 'dark', 'light');
+    html.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.documentElement.lang = language;
+    document.title =
+      language === 'en'
+        ? 'Maintenance Request Platform'
+        : 'Plataforma de Solicitudes de Mantenimiento';
+    applyLanguageToDOM(document.body, language);
+
+    let applying = false;
+    const observer = new MutationObserver(() => {
+      if (applying) return;
+      applying = true;
+      applyLanguageToDOM(document.body, language);
+      applying = false;
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => observer.disconnect();
+  }, [language, pathname, state]);
 
   const submissionCacheRef = useRef<Map<string, Solicitud>>(new Map());
 
@@ -2156,6 +2270,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toasts,
     pushToast,
     dismissToast,
+    theme,
+    setTheme,
+    toggleTheme,
+    language,
+    setLanguage,
+    toggleLanguage,
+    t,
     empleados: empleadosVisibles,
     usuarios: usuariosVisibles,
     tiposRecurso: state.tiposRecurso,

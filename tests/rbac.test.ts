@@ -16,6 +16,11 @@ import {
   tienePermisoRuta,
   verifyPassword,
 } from '../src/services/domainRules';
+import {
+  LANG_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  translateText,
+} from '../src/i18n/translations';
 
 describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cliente', () => {
   const adminUser = SEED_USUARIOS.find((u) => u.perfil === 'ADMINISTRADOR')!;
@@ -546,5 +551,25 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
     });
     assert.equal(resLogin.status, 200);
     assert.equal(resLogin.body.ok, true);
+  });
+
+  // ==========================================================================
+  // 6. Pruebas de Internacionalización (ES/EN) y Preferencias de Tema
+  // ==========================================================================
+  it('traduce bidireccionalmente los textos de la interfaz entre español e inglés y define claves de persistencia', () => {
+    assert.equal(THEME_STORAGE_KEY, 'plataforma_mantenimiento_theme');
+    assert.equal(LANG_STORAGE_KEY, 'plataforma_mantenimiento_lang');
+
+    // Traducción Español -> Inglés
+    assert.equal(translateText('Nueva solicitud', 'en'), 'New request');
+    assert.equal(translateText('Iniciar sesión', 'en'), 'Sign in');
+    assert.equal(translateText('Hola, William.', 'en'), 'Hello, William.');
+    assert.equal(translateText('Total: 6 resultado(s)', 'en'), 'Total: 6 result(s)');
+
+    // Traducción inversa Inglés -> Español
+    assert.equal(translateText('New request', 'es'), 'Nueva solicitud');
+    assert.equal(translateText('Sign in', 'es'), 'Iniciar sesión');
+    assert.equal(translateText('Hello, William.', 'es'), 'Hola, William.');
+    assert.equal(translateText('Total: 6 result(s)', 'es'), 'Total: 6 resultado(s)');
   });
 });

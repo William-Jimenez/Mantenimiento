@@ -10,6 +10,7 @@ import {
   PrimaryButton,
 } from '../components/CommonUI';
 import { LogoLockup } from '../components/ConstellationCanvas';
+import { ThemeLanguageControls } from '../components/ThemeLanguageControls';
 
 export function ChangePasswordScreen() {
   const {
@@ -88,18 +89,21 @@ export function ChangePasswordScreen() {
       data-testid="pantalla-cambio-contrasena"
       className="min-h-screen bg-void text-bone-white flex flex-col justify-between px-[18px] sm:px-[30px] py-[30px]"
     >
-      <div className="max-w-[1280px] w-full mx-auto flex items-center justify-between gap-4">
+      <div className="max-w-[1280px] w-full mx-auto flex flex-wrap items-center justify-between gap-4">
         <LogoLockup onClick={handleVolver} />
-        {currentUser ? (
-          <GhostButton onClick={() => logout('Sesión cerrada')}>Cerrar sesión</GhostButton>
-        ) : (
-          <GhostButton onClick={() => navigate('/login')}>
-            <span className="inline-flex items-center gap-[6px]">
-              <ArrowLeft className="w-[14px] h-[14px]" aria-hidden="true" />
-              <span>Volver al inicio de sesión</span>
-            </span>
-          </GhostButton>
-        )}
+        <div className="flex flex-wrap items-center gap-[12px]">
+          <ThemeLanguageControls />
+          {currentUser ? (
+            <GhostButton onClick={() => logout('Sesión cerrada')}>Cerrar sesión</GhostButton>
+          ) : (
+            <GhostButton onClick={() => navigate('/login')}>
+              <span className="inline-flex items-center gap-[6px]">
+                <ArrowLeft className="w-[14px] h-[14px]" aria-hidden="true" />
+                <span>Volver al inicio de sesión</span>
+              </span>
+            </GhostButton>
+          )}
+        </div>
       </div>
 
       <div className="max-w-[560px] w-full mx-auto py-[36px] sm:py-[48px] space-y-[28px]">

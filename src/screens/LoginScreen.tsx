@@ -3,6 +3,7 @@ import { ArrowDown, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, UserPlus } 
 import { useApp } from '../context/AppContext';
 import { ConstellationCanvas, LogoLockup } from '../components/ConstellationCanvas';
 import { FieldError, FieldLabel, inputBaseClass, OutlineButton, PrimaryButton } from '../components/CommonUI';
+import { ThemeLanguageControls } from '../components/ThemeLanguageControls';
 import { ServiceScrollNarrative } from '../components/ServiceScrollNarrative';
 import { CampoRegistro, validarDatosRegistro } from '../services/domainRules';
 
@@ -213,16 +214,19 @@ export function LoginScreen() {
         ref={topSectionRef}
         className="min-h-screen flex flex-col justify-between px-[18px] sm:px-[30px] py-[20px] sm:py-[24px]"
       >
-        <div className="max-w-[1280px] w-full mx-auto flex items-center justify-between gap-4">
+        <div className="max-w-[1280px] w-full mx-auto flex flex-wrap items-center justify-between gap-3">
           <LogoLockup />
-          <button
-            type="button"
-            onClick={scrollToNarrative}
-            className="inline-flex items-center gap-[8px] px-[14px] py-[6px] rounded-full border border-white/15 hover:border-white/35 text-[12px] text-silver-mist hover:text-bone-white transition-colors cursor-pointer"
-          >
-            <span>Conocer el servicio</span>
-            <ArrowDown className="w-[13px] h-[13px] text-saffron-spark" aria-hidden="true" />
-          </button>
+          <div className="flex flex-wrap items-center gap-[10px]">
+            <ThemeLanguageControls />
+            <button
+              type="button"
+              onClick={scrollToNarrative}
+              className="inline-flex items-center gap-[8px] px-[14px] py-[6px] min-h-[36px] rounded-full border border-white/15 hover:border-white/35 text-[12px] text-silver-mist hover:text-bone-white transition-colors cursor-pointer"
+            >
+              <span>Conocer el servicio</span>
+              <ArrowDown className="w-[13px] h-[13px] text-saffron-spark" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <div className="max-w-[1280px] w-full mx-auto flex-1 flex items-center py-[16px] lg:py-[24px]">

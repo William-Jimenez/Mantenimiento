@@ -88,6 +88,54 @@
   }
 }
 
+/* ==========================================================================
+   Light Theme Support (html[data-theme="light"] / html.theme-light)
+   ========================================================================== */
+html[data-theme="light"],
+html.theme-light {
+  --color-void: #f8fafc;
+  --color-bone-white: #0f172a;
+  --color-ash-gray: #475569;
+  --color-silver-mist: #334155;
+  --color-electric-iris: #6d28d9;
+  --color-saffron-spark: #b45309;
+  --color-deep-verdant: #0f766e;
+  color-scheme: light;
+}
+
+html[data-theme="light"] input,
+html[data-theme="light"] textarea,
+html[data-theme="light"] select,
+html.theme-light input,
+html.theme-light textarea,
+html.theme-light select {
+  color-scheme: light;
+  background-color: #ffffff;
+  border-color: rgba(15, 23, 42, 0.22);
+}
+
+html[data-theme="light"] .bg-electric-iris,
+html[data-theme="light"] .bg-deep-verdant,
+html.theme-light .bg-electric-iris,
+html.theme-light .bg-deep-verdant {
+  color: #ffffff;
+}
+
+html[data-theme="light"] [class*="border-white/"],
+html.theme-light [class*="border-white/"] {
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
+html[data-theme="light"] [class*="divide-white/"] > :not([hidden]) ~ :not([hidden]),
+html.theme-light [class*="divide-white/"] > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+html[data-theme="light"] [class*="bg-white/"],
+html.theme-light [class*="bg-white/"] {
+  background-color: rgba(15, 23, 42, 0.035);
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
