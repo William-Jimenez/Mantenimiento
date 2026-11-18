@@ -84,6 +84,9 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
   // 1. Pruebas de Reglas de Dominio y Guardias de Rutas en Interfaz
   // ==========================================================================
   it('verifica que un CLIENTE no puede acceder a rutas de empleado ni de administrador en la interfaz', () => {
+    // La contraseña de la cuenta admin en el seed está almacenada con hash PBKDF2-HMAC-SHA256 (nunca en texto plano)
+    assert.equal(esPasswordHasheada(adminUser.password), true);
+
     // Rutas permitidas para CLIENTE
     assert.equal(tienePermisoRuta(clienteUser, '/'), true);
     assert.equal(tienePermisoRuta(clienteUser, '/solicitudes'), true);
