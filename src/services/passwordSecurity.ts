@@ -181,6 +181,15 @@ export function esPasswordHasheada(stored: string): boolean {
 }
 
 /**
+ * Calcula el hash criptográfico SHA-256 real (64 caracteres hexadecimales, FIPS 180-4)
+ * sobre un arreglo de bytes o cadena (por ejemplo, dataUrl o contenido binario de evidencia).
+ */
+export function calcularHashSha256(input: Uint8Array | string): string {
+  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
+  return bytesToHex(sha256Bytes(bytes));
+}
+
+/**
  * Genera un hash criptográfico robusto (PBKDF2-HMAC-SHA256 con sal aleatoria de 128 bits y 10.000 iteraciones).
  * Nunca almacena la contraseña en texto plano.
  */

@@ -58,6 +58,7 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
     agregarEvidencias,
     solicitarNuevoAnalisisIa,
     revisarAnalisisIa,
+    obtenerNombreUsuarioActuante,
   } = useApp();
 
   const solicitud = solicitudes.find((s) => s.id === solicitudId);
@@ -304,7 +305,16 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
     }> = [];
 
     for (const file of Array.from(fileList)) {
-      const check = validarArchivoEvidencia(file, fotosCount, pdfsCount);
+      let headerBytes: Uint8Array | undefined;
+      try {
+        if (typeof file.slice === 'function') {
+          const buf = await file.slice(0, 16).arrayBuffer();
+          headerBytes = new Uint8Array(buf);
+        }
+      } catch {
+        // Fallback if arrayBuffer slice is unavailable
+      }
+      const check = validarArchivoEvidencia(file, fotosCount, pdfsCount, headerBytes);
       if (!check.ok) {
         setUploadError(check.error);
         continue;
@@ -824,18 +834,14 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
             </dl>
           </div>
 
-          {/* Historial de estados (PRD 1.8) */}
+          {/* Historial de estados (HU-20) */}
           <div className="space-y-[18px]">
             <h2 className="nav-label text-ash-gray">Historial de estados</h2>
             <ol className="border-t border-white/12 divide-y divide-white/10">
               {solicitudHistorial.map((h) => {
-                const usr = !isCliente
-                  ? usuarios.find((u) => u.id === h.usuarioId)
+                const nombreActuante = !isCliente
+                  ? obtenerNombreUsuarioActuante(h.usuarioId)
                   : undefined;
-                const emp =
-                  !isCliente && usr
-                    ? empleados.find((e) => e.id === usr.empleadoId)
-                    : undefined;
 
                 return (
                   <li key={h.id} className="py-[14px] space-y-[4px]">
@@ -851,10 +857,10 @@ export function RequestDetailScreen({ solicitudId }: { solicitudId: number }) {
                     </div>
                     {!isCliente && (
                       <p className="text-[13px] text-silver-mist">
-                        Por {emp ? `${emp.nombres} ${emp.apellidos}` : 'Sistema'}
+                        Por {nombreActuante || 'Sistema'}
                       </p>
                     )}
-                    {h.motivo && !isCliente && (
+                    {h.motivo && (
                       <p className="text-[13px] text-ash-gray italic">
                         “{h.motivo}”
                       </p>

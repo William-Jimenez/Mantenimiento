@@ -5,6 +5,7 @@ import com.mantenimiento.domain.entity.TipoRecurso;
 import com.mantenimiento.dto.RecursoDtos.*;
 import com.mantenimiento.exception.ApiException;
 import com.mantenimiento.repository.RecursoRepository;
+import com.mantenimiento.repository.SolicitudRepository;
 import com.mantenimiento.repository.TipoRecursoRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/recursos")
@@ -20,10 +22,16 @@ public class RecursoController {
 
     private final RecursoRepository recursoRepository;
     private final TipoRecursoRepository tipoRecursoRepository;
+    private final SolicitudRepository solicitudRepository;
 
-    public RecursoController(RecursoRepository recursoRepository, TipoRecursoRepository tipoRecursoRepository) {
+    public RecursoController(
+            RecursoRepository recursoRepository,
+            TipoRecursoRepository tipoRecursoRepository,
+            SolicitudRepository solicitudRepository
+    ) {
         this.recursoRepository = recursoRepository;
         this.tipoRecursoRepository = tipoRecursoRepository;
+        this.solicitudRepository = solicitudRepository;
     }
 
     @GetMapping
@@ -90,6 +98,25 @@ public class RecursoController {
 
         recurso = recursoRepository.save(recurso);
         return ResponseEntity.ok(toResponse(recurso));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<Map<String, String>> eliminarRecurso(@PathVariable Long id) {
+        Recurso recurso = recursoRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Recurso no encontrado"));
+
+        boolean tieneSolicitudes = solicitudRepository.findAll().stream()
+                .anyMatch(s -> s.getRecurso().getId().equals(id));
+        if (tieneSolicitudes) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "No se permite la eliminación física de un recurso con historial de solicitudes vinculadas. Utilice la inactivación lógica"
+            );
+        }
+
+        recursoRepository.delete(recurso);
+        return ResponseEntity.ok(Map.of("mensaje", "Recurso eliminado correctamente"));
     }
 
     private RecursoResponse toResponse(Recurso r) {

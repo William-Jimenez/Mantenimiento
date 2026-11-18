@@ -91,4 +91,55 @@ public class SolicitudController {
     ) {
         return ResponseEntity.ok(solicitudService.obtenerHistorial(id, currentUser));
     }
+
+    // HU-07 y HU-10: Adjunción de evidencias con validación de firma binaria y descarga protegida
+    @PostMapping("/{id}/evidencias")
+    public ResponseEntity<EvidenciaDto> adjuntarEvidencia(
+            @PathVariable Long id,
+            @Valid @RequestBody UploadEvidenciaRequest request,
+            @AuthenticationPrincipal CustomUserDetails currentUser
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(solicitudService.adjuntarEvidencia(id, request, currentUser));
+    }
+
+    @GetMapping("/{id}/evidencias/{evidenciaId}/descargar")
+    public ResponseEntity<Map<String, Object>> descargarEvidencia(
+            @PathVariable Long id,
+            @PathVariable Long evidenciaId,
+            @AuthenticationPrincipal CustomUserDetails currentUser
+    ) {
+        return ResponseEntity.ok(solicitudService.descargarEvidenciaProtegida(id, evidenciaId, currentUser));
+    }
+
+    // HU-16, HU-17 y HU-18: Análisis de IA, reintento y revisión humana
+    @GetMapping("/{id}/analisis-ia")
+    public ResponseEntity<List<AnalisisIADto>> listarAnalisisIA(
+            @PathVariable Long id,
+            @AuthenticationPrincipal CustomUserDetails currentUser
+    ) {
+        return ResponseEntity.ok(solicitudService.listarAnalisisIA(id, currentUser));
+    }
+
+    @PostMapping("/{id}/analisis-ia")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<AnalisisIADto> dispararAnalisisIA(
+            @PathVariable Long id,
+            @RequestBody(required = false) TriggerAnalisisIARequest request,
+            @AuthenticationPrincipal CustomUserDetails currentUser
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(solicitudService.dispararAnalisisIA(id, request, currentUser));
+    }
+
+    @PostMapping("/{id}/analisis-ia/{analisisId}/revisar")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<AnalisisIADto> revisarAnalisisIA(
+            @PathVariable Long id,
+            @PathVariable Long analisisId,
+            @Valid @RequestBody RevisarAnalisisIARequest request,
+            @AuthenticationPrincipal CustomUserDetails currentUser
+    ) {
+        return ResponseEntity.ok(solicitudService.revisarAnalisisIA(id, analisisId, request, currentUser));
+    }
 }

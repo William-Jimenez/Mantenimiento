@@ -54,6 +54,7 @@ export function UsersScreen() {
   const [nuevoCorreo, setNuevoCorreo] = useState('');
   const [nuevoCargo, setNuevoCargo] = useState('');
   const [perfilNuevo, setPerfilNuevo] = useState<PerfilUsuario>('CLIENTE');
+  const [passwordInicial, setPasswordInicial] = useState('');
   const [errorCrearModal, setErrorCrearModal] = useState<string | null>(null);
 
   const [editUsuarioId, setEditUsuarioId] = useState<number | null>(null);
@@ -91,6 +92,7 @@ export function UsersScreen() {
     setNuevoCorreo('');
     setNuevoCargo('');
     setPerfilNuevo('CLIENTE');
+    setPasswordInicial('');
     setCrearOpen(true);
   };
 
@@ -105,7 +107,7 @@ export function UsersScreen() {
         return;
       }
       const emp = empleados.find((em) => em.id === selectedEmpId);
-      const res = crearUsuario(selectedEmpId, perfilNuevo);
+      const res = crearUsuario(selectedEmpId, perfilNuevo, undefined, passwordInicial);
       if (!res.ok) {
         setErrorCrearModal(res.error ?? 'No se pudo crear el usuario.');
         return;
@@ -121,13 +123,18 @@ export function UsersScreen() {
       return;
     }
 
-    const res = crearUsuario(0, perfilNuevo, {
-      documento: nuevoDoc,
-      nombres: nuevoNombres,
-      apellidos: nuevoApellidos,
-      correo: nuevoCorreo,
-      cargo: nuevoCargo,
-    });
+    const res = crearUsuario(
+      0,
+      perfilNuevo,
+      {
+        documento: nuevoDoc,
+        nombres: nuevoNombres,
+        apellidos: nuevoApellidos,
+        correo: nuevoCorreo,
+        cargo: nuevoCargo,
+      },
+      passwordInicial
+    );
     if (!res.ok) {
       setErrorCrearModal(res.error ?? 'No se pudo crear el usuario.');
       return;
@@ -450,6 +457,20 @@ export function UsersScreen() {
               <option value="EMPLEADO">Empleado (Técnico)</option>
               <option value="ADMINISTRADOR">Administrador</option>
             </select>
+          </div>
+
+          <div>
+            <FieldLabel htmlFor="usr-password-inicial">
+              Contraseña inicial (opcional)
+            </FieldLabel>
+            <input
+              id="usr-password-inicial"
+              type="text"
+              value={passwordInicial}
+              onChange={(e) => setPasswordInicial(e.target.value)}
+              placeholder="Dejar vacía para autogenerar contraseña temporal"
+              className={inputBaseClass}
+            />
           </div>
 
           <FieldError message={errorCrearModal} />

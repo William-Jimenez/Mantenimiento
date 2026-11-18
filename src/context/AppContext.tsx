@@ -32,10 +32,12 @@ import {
   SEED_USUARIOS,
 } from '../data/seed';
 import {
+  calcularHashSha256,
   CampoRegistro,
   esEstadoFinal,
   ETIQUETA_PERFIL,
   generarCodigoSolicitud,
+  generarInferenciaAnalisisIa,
   hashPassword,
   obtenerTransicionesPermitidas,
   puedeAdjuntarEvidencia,
@@ -46,6 +48,7 @@ import {
   puedeVerSolicitud,
   validarDatosRegistro,
   validarPoliticaPassword,
+  verificarFirmaBinariaEvidencia,
   verifyPassword,
 } from '../services/domainRules';
 import {
@@ -223,7 +226,8 @@ interface AppContextValue {
       apellidos: string;
       correo: string;
       cargo: string;
-    }
+    },
+    passwordInicial?: string
   ) => ActionResult<{ passwordTemporal: string }>;
   editarUsuario: (
     usuarioId: number,
@@ -253,11 +257,13 @@ interface AppContextValue {
     }
   ) => ActionResult<Recurso>;
   toggleRecursoActivo: (recursoId: number) => ActionResult;
+  eliminarRecurso: (recursoId: number) => ActionResult;
   crearCategoria: (nombre: string) => ActionResult<Categoria>;
   renombrarCategoria: (id: number, nombre: string) => ActionResult;
   toggleCategoriaActiva: (id: number) => ActionResult;
 
   // M3, M4, M5 Solicitudes, Evidencias, Asignaciones, Estados
+  obtenerNombreUsuarioActuante: (usuarioId: number) => string;
   crearSolicitud: (input: {
     submissionToken: string;
     recursoId: number;
@@ -625,47 +631,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             };
           }
 
-          // Infer deterministic, domain-grounded classification using active catalogs
-          const text = `${sol.descripcion} ${rec?.nombre ?? ''}`.toLowerCase();
-          const activeCats = prev.categorias.filter((c) => c.activa);
-
-          const findCat = (keyword: string, fallbackName: string) =>
-            activeCats.find((c) => c.nombre.toLowerCase().includes(keyword)) ??
-            activeCats.find((c) => c.nombre === fallbackName) ??
-            activeCats[0] ??
-            null;
-
-          let tipoDano = 'Desgaste o falla operativa general';
-          let cat = findCat('otra', 'Otra');
-          let prioNivel: 1 | 2 | 3 | 4 = 2;
-
-          if (/agua|goteo|fuga|tuber|humedad|drenaje/.test(text)) {
-            tipoDano = 'Fuga o filtración hidráulica';
-            cat = findCat('hidr', 'Hidráulica');
-            prioNivel = 2;
-          } else if (/eléctric|electr|breaker|volt|corto|tablero|cable|luz/.test(text)) {
-            tipoDano = 'Falla en circuito eléctrico';
-            cat = findCat('eléctr', 'Eléctrica');
-            prioNivel = 3;
-          } else if (/servidor|red|comput|impresora|pantalla|software|ti|ventilador/.test(text)) {
-            tipoDano = 'Falla de hardware o infraestructura TI';
-            cat = findCat('inform', 'Informática/Electrónica');
-            prioNivel = /alerta|crític|detiene|humo/.test(text) ? 4 : 3;
-          } else if (/motor|compresor|vibraci|mandril|ruido|maquin|mecánic|taladro/.test(text)) {
-            tipoDano = 'Desajuste o avería mecánica';
-            cat = findCat('mecán', 'Mecánica');
-            prioNivel = 3;
-          } else if (/piso|pared|techo|puerta|cerradura|ventana|locativ/.test(text)) {
-            tipoDano = 'Deterioro locativo o estructural';
-            cat = findCat('locat', 'Locativa/Estructural');
-            prioNivel = 2;
-          }
-
-          const prio = prev.prioridades.find((p) => p.nivel === prioNivel) ?? prev.prioridades[1];
-          const evidenciasTexto =
-            evs.length > 0
-              ? `Se analizaron ${evs.length} evidencia(s) adjunta(s) junto con la descripción del recurso ${rec?.codigo ?? ''}.`
-              : 'Sin evidencias adjuntas; análisis basado únicamente en la descripción textual del reporte.';
+          // Infer deterministic, domain-grounded classification validated against active catalogs (HU-16, HU-17)
+          const inferencia = generarInferenciaAnalisisIa(
+            sol.descripcion,
+            rec?.nombre ?? '',
+            rec?.codigo ?? '',
+            evs.length,
+            prev.categorias,
+            prev.prioridades
+          );
 
           return {
             ...prev,
@@ -674,11 +648,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 ? {
                     ...a,
                     estadoAnalisis: 'COMPLETADO',
-                    tipoDano,
-                    descripcionObservada: `${evidenciasTexto} Se identifica posible ${tipoDano.toLowerCase()} que requiere verificación técnica en sitio.`,
-                    categoriaSugeridaId: cat ? cat.id : null,
-                    prioridadSugeridaId: prio ? prio.id : null,
-                    modelo: 'AnalizadorIa-v1',
+                    tipoDano: inferencia.tipoDano,
+                    descripcionObservada: inferencia.descripcionObservada,
+                    categoriaSugeridaId: inferencia.categoriaSugeridaId,
+                    prioridadSugeridaId: inferencia.prioridadSugeridaId,
+                    modelo: inferencia.modelo,
                     completadoEn: new Date().toISOString(),
                     errorDetalle: null,
                   }
@@ -1311,10 +1285,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const crearUsuario: AppContextValue['crearUsuario'] = useCallback(
-    (empleadoId, perfil, nuevoRegistro): ActionResult<{ passwordTemporal: string }> => {
+    (empleadoId, perfil, nuevoRegistro, passwordInicial): ActionResult<{ passwordTemporal: string }> => {
       if (!puedeGestionarUsuarios(currentUser)) {
         return { ok: false, codigo: 'ACCESO_DENEGADO', error: 'Acceso denegado: solo el Administrador puede gestionar usuarios.' };
       }
+
+      const cleanInitPass = passwordInicial?.trim() ?? '';
+      if (cleanInitPass && cleanInitPass.length < 8) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          error: 'La contraseña inicial debe tener al menos 8 caracteres.',
+        };
+      }
+
+      const passwordTemporal =
+        cleanInitPass || `Temp${Math.floor(100000 + Math.random() * 899999)}a`;
+      const passwordHasheada = hashPassword(passwordTemporal);
 
       const now = new Date().toISOString();
       let targetEmpId = empleadoId;
@@ -1372,13 +1359,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           actualizadoEn: now,
         };
 
-        const passwordTemporal = `Temp${Math.floor(100000 + Math.random() * 899999)}a`;
         const nextId = Math.max(0, ...state.usuarios.map((u) => u.id)) + 1;
         const nuevo: Usuario = {
           id: nextId,
           empleadoId: targetEmpId,
           perfil,
-          password: passwordTemporal,
+          password: passwordHasheada,
           debeCambiarPassword: true,
           intentosFallidos: 0,
           bloqueadoHasta: null,
@@ -1402,13 +1388,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, codigo: 'DUPLICADO', error: 'Este registro ya tiene un usuario asociado.' };
       }
 
-      const passwordTemporal = `Temp${Math.floor(100000 + Math.random() * 899999)}a`;
       const nextId = Math.max(0, ...state.usuarios.map((u) => u.id)) + 1;
       const nuevo: Usuario = {
         id: nextId,
         empleadoId: targetEmpId,
         perfil,
-        password: passwordTemporal,
+        password: passwordHasheada,
         debeCambiarPassword: true,
         intentosFallidos: 0,
         bloqueadoHasta: null,
@@ -1420,7 +1405,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         empleados: prev.empleados.map((e) =>
           e.id === targetEmpId
-            ? { ...e, esTecnico: perfil === 'EMPLEADO', actualizadoEn: now }
+            ? { ...e, esTecnico: e.esTecnico || perfil === 'EMPLEADO', actualizadoEn: now }
             : e
         ),
         usuarios: [...prev.usuarios, nuevo],
@@ -1484,6 +1469,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // HU-03: Impedir retiro de función técnica o inactivación si tiene órdenes en Asignada o En proceso
+      const empActual = state.empleados.find((e) => e.id === usr.empleadoId);
+      const nuevoEsTecnico = data.perfil === 'EMPLEADO' || (empActual?.esTecnico && data.perfil === 'ADMINISTRADOR');
+      if (empActual && empActual.esTecnico && (!nuevoEsTecnico || !data.activo)) {
+        const solicitudesActivas = state.asignaciones
+          .filter((a) => a.vigente && a.tecnicoId === empActual.id)
+          .map((a) => state.solicitudes.find((s) => s.id === a.solicitudId))
+          .filter((s): s is Solicitud => !!s && (s.estado === 'Asignada' || s.estado === 'En proceso'));
+        if (solicitudesActivas.length > 0) {
+          return {
+            ok: false,
+            codigo: 'REGLA_NEGOCIO',
+            error: `El técnico tiene ${solicitudesActivas.length} solicitud(es) activa(s) (${solicitudesActivas
+              .map((s) => s.codigo)
+              .join(', ')}). Reasígnelas antes de retirar su función técnica o desactivarlo.`,
+          };
+        }
+      }
+
       const now = new Date().toISOString();
       setState((prev) => ({
         ...prev,
@@ -1500,7 +1504,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 apellidos: apellidosClean,
                 correo: correoClean,
                 cargo: cargoClean || e.cargo,
-                esTecnico: data.perfil === 'EMPLEADO',
+                esTecnico: Boolean(nuevoEsTecnico),
                 activo: data.activo,
                 actualizadoEn: now,
               }
@@ -1511,7 +1515,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       pushToast('exito', 'Datos y rol del usuario actualizados.');
       return { ok: true };
     },
-    [currentUser, state.usuarios, state.empleados, pushToast]
+    [currentUser, state.usuarios, state.empleados, state.asignaciones, state.solicitudes, pushToast]
   );
 
   const toggleUsuarioActivo = useCallback(
@@ -1568,19 +1572,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // HU-03: Si el empleado es técnico y pasa a CLIENTE, verificar que no tenga solicitudes en Asignada o En proceso
+      const empActual = state.empleados.find((e) => e.id === usr.empleadoId);
+      const nuevoEsTecnico = perfil === 'EMPLEADO' || (empActual?.esTecnico && perfil === 'ADMINISTRADOR');
+      if (empActual && empActual.esTecnico && !nuevoEsTecnico) {
+        const solicitudesActivas = state.asignaciones
+          .filter((a) => a.vigente && a.tecnicoId === empActual.id)
+          .map((a) => state.solicitudes.find((s) => s.id === a.solicitudId))
+          .filter((s): s is Solicitud => !!s && (s.estado === 'Asignada' || s.estado === 'En proceso'));
+        if (solicitudesActivas.length > 0) {
+          return {
+            ok: false,
+            codigo: 'REGLA_NEGOCIO',
+            error: `No se puede retirar la función técnica: tiene solicitudes activas (${solicitudesActivas
+              .map((s) => s.codigo)
+              .join(', ')}). Reasígnelas antes de cambiar su rol.`,
+          };
+        }
+      }
+
       setState((prev) => ({
         ...prev,
         usuarios: prev.usuarios.map((u) => (u.id === usuarioId ? { ...u, perfil } : u)),
         empleados: prev.empleados.map((e) =>
           e.id === usr.empleadoId
-            ? { ...e, esTecnico: perfil === 'EMPLEADO', actualizadoEn: new Date().toISOString() }
+            ? { ...e, esTecnico: Boolean(nuevoEsTecnico), actualizadoEn: new Date().toISOString() }
             : e
         ),
       }));
       pushToast('exito', `Rol actualizado a ${ETIQUETA_PERFIL[perfil]}.`);
       return { ok: true };
     },
-    [currentUser, state.usuarios, pushToast]
+    [currentUser, state.usuarios, state.empleados, state.asignaciones, state.solicitudes, pushToast]
   );
 
   const restablecerPasswordUsuario = useCallback(
@@ -1593,13 +1616,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, codigo: 'REGLA_NEGOCIO', error: 'No disponible para usuarios desactivados.' };
       }
       const passwordTemporal = `Reset${Math.floor(100000 + Math.random() * 899999)}b`;
+      const passwordHasheada = hashPassword(passwordTemporal);
       setState((prev) => ({
         ...prev,
         usuarios: prev.usuarios.map((u) =>
           u.id === usuarioId
             ? {
                 ...u,
-                password: passwordTemporal,
+                password: passwordHasheada,
                 debeCambiarPassword: true,
                 intentosFallidos: 0,
                 bloqueadoHasta: null,
@@ -1696,6 +1720,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { ok: true };
     },
     [currentUser, state.recursos, pushToast]
+  );
+
+  const eliminarRecurso = useCallback(
+    (recursoId: number): ActionResult => {
+      if (!currentUser || currentUser.perfil !== 'ADMINISTRADOR') {
+        return { ok: false, codigo: 'ACCESO_DENEGADO', error: 'Acceso denegado.' };
+      }
+      const rec = state.recursos.find((r) => r.id === recursoId);
+      if (!rec) return { ok: false, error: 'Recurso no encontrado.' };
+
+      const tieneSolicitudes = state.solicitudes.some((s) => s.recursoId === recursoId);
+      if (tieneSolicitudes) {
+        return {
+          ok: false,
+          codigo: 'REGLA_NEGOCIO',
+          error:
+            'No se puede eliminar físicamente un recurso que ya posee historial de solicitudes vinculadas. Utilice la inactivación lógica para resguardar la integridad histórica.',
+        };
+      }
+
+      setState((prev) => ({
+        ...prev,
+        recursos: prev.recursos.filter((r) => r.id !== recursoId),
+      }));
+      pushToast('exito', 'Recurso eliminado.');
+      return { ok: true };
+    },
+    [currentUser, state.recursos, state.solicitudes, pushToast]
   );
 
   const crearCategoria = useCallback(
@@ -1835,6 +1887,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         version: 1,
       };
 
+      for (const arc of input.archivos) {
+        if (arc.dataUrl && arc.dataUrl.startsWith('data:') && arc.dataUrl.includes(';base64,')) {
+          const checkMagic = verificarFirmaBinariaEvidencia(arc.dataUrl, arc.nombreOriginal);
+          if (!checkMagic.ok) {
+            return {
+              ok: false,
+              codigo: 'VALIDACION',
+              error: checkMagic.error,
+            };
+          }
+        }
+      }
+
       const nextEvBase = Math.max(0, ...state.evidencias.map((e) => e.id));
       const nuevasEvidencias: Evidencia[] = input.archivos.map((arc, idx) => ({
         id: nextEvBase + idx + 1,
@@ -1844,7 +1909,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         nombreAlmacenado: `ev-${nextSolId}-${Date.now()}-${idx}`,
         tipoMime: arc.tipoMime,
         tamanoBytes: arc.tamanoBytes,
-        hashSha256: Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2),
+        hashSha256: calcularHashSha256(arc.dataUrl || `${arc.nombreOriginal}-${arc.tamanoBytes}`),
         subidaPorUsuarioId: currentUser.id,
         subidaEn: now,
         dataUrl: arc.dataUrl,
@@ -1941,6 +2006,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, codigo: 'VALIDACION', error: 'Máximo 2 documentos PDF por solicitud.' };
       }
 
+      for (const arc of archivos) {
+        if (arc.dataUrl && arc.dataUrl.startsWith('data:') && arc.dataUrl.includes(';base64,')) {
+          const checkMagic = verificarFirmaBinariaEvidencia(arc.dataUrl, arc.nombreOriginal);
+          if (!checkMagic.ok) {
+            return {
+              ok: false,
+              codigo: 'VALIDACION',
+              error: checkMagic.error,
+            };
+          }
+        }
+      }
+
       const now = new Date().toISOString();
       const baseId = Math.max(0, ...state.evidencias.map((e) => e.id));
       const nuevas: Evidencia[] = archivos.map((arc, idx) => ({
@@ -1951,7 +2029,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         nombreAlmacenado: `ev-${solicitudId}-${Date.now()}-${idx}`,
         tipoMime: arc.tipoMime,
         tamanoBytes: arc.tamanoBytes,
-        hashSha256: Math.random().toString(16).slice(2),
+        hashSha256: calcularHashSha256(arc.dataUrl || `${arc.nombreOriginal}-${arc.tamanoBytes}`),
         subidaPorUsuarioId: currentUser.id,
         subidaEn: now,
         dataUrl: arc.dataUrl,
@@ -2394,6 +2472,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const isTecnico = currentUser?.perfil === 'EMPLEADO';
   const isCliente = currentUser?.perfil === 'CLIENTE';
 
+  const obtenerNombreUsuarioActuante = useCallback(
+    (usuarioId: number): string => {
+      const usr = state.usuarios.find((u) => u.id === usuarioId);
+      if (!usr) return 'Sistema';
+      const emp = state.empleados.find((e) => e.id === usr.empleadoId);
+      return emp ? `${emp.nombres} ${emp.apellidos}` : `Usuario #${usuarioId}`;
+    },
+    [state.usuarios, state.empleados]
+  );
+
   const empleadosVisibles = useMemo(() => {
     if (!currentUser || !currentEmpleado) return [];
     if (isAdmin) return state.empleados;
@@ -2413,6 +2501,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return puedeVerSolicitud(currentUser, currentEmpleado, sol, asig);
     });
   }, [currentUser, currentEmpleado, state.solicitudes, state.asignaciones]);
+
+  const analisisIaVisibles = useMemo(() => {
+    if (!currentUser || !currentEmpleado) return [];
+    if (isAdmin) return state.analisisIa;
+    const idsVisibles = new Set(solicitudesAccesibles.map((s) => s.id));
+    return state.analisisIa.filter((a) => idsVisibles.has(a.solicitudId));
+  }, [currentUser, currentEmpleado, isAdmin, state.analisisIa, solicitudesAccesibles]);
 
   const value: AppContextValue = {
     pathname,
@@ -2445,7 +2540,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     solicitudes: solicitudesAccesibles,
     evidencias: state.evidencias,
     asignaciones: state.asignaciones,
-    analisisIa: isAdmin ? state.analisisIa : [],
+    analisisIa: analisisIaVisibles,
     historial: state.historial,
     iaHabilitada: state.iaHabilitada,
     setIaHabilitada,
@@ -2467,9 +2562,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     restablecerPasswordUsuario,
     guardarRecurso,
     toggleRecursoActivo,
+    eliminarRecurso,
     crearCategoria,
     renombrarCategoria,
     toggleCategoriaActiva,
+    obtenerNombreUsuarioActuante,
     crearSolicitud,
     agregarEvidencias,
     asignarTecnico,

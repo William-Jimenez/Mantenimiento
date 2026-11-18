@@ -1,42 +1,68 @@
 import express, { NextFunction, Request, Response } from 'express';
 import {
+  SEED_ANALISIS_IA,
   SEED_ASIGNACIONES,
+  SEED_CATEGORIAS,
   SEED_EMPLEADOS,
+  SEED_EVIDENCIAS,
   SEED_HISTORIAL,
+  SEED_PRIORIDADES,
   SEED_RECURSOS,
   SEED_SOLICITUDES,
+  SEED_TIPOS_RECURSO,
   SEED_USUARIOS,
 } from '../data/seed';
 import {
+  calcularHashSha256,
+  esEstadoFinal,
   generarCodigoSolicitud,
+  generarInferenciaAnalisisIa,
   hashPassword,
+  MAX_FOTO_BYTES,
+  MAX_FOTOS,
+  MAX_PDF_BYTES,
+  MAX_PDFS,
   obtenerTransicionesPermitidas,
+  puedeAdjuntarEvidencia,
   puedeAsignarTecnico,
   puedeCrearSolicitud,
   puedeGestionarUsuarios,
   puedeRegistrarTrabajo,
+  puedeRevisarIa,
   puedeVerSolicitud,
   validarDatosRegistro,
   validarPoliticaPassword,
+  verificarFirmaBinariaEvidencia,
   verifyPassword,
 } from '../services/domainRules';
 import {
+  AnalisisIa,
   Asignacion,
+  Categoria,
+  DecisionRevisionIa,
   Empleado,
   EstadoNombre,
+  Evidencia,
   HistorialEstado,
   PerfilUsuario,
+  Prioridad,
   Recurso,
   Solicitud,
+  TipoRecurso,
   Usuario,
 } from '../types/domain';
 
 export interface BackendStore {
   empleados: Empleado[];
   usuarios: Usuario[];
+  tiposRecurso: TipoRecurso[];
   recursos: Recurso[];
+  categorias: Categoria[];
+  prioridades: Prioridad[];
   solicitudes: Solicitud[];
+  evidencias: Evidencia[];
   asignaciones: Asignacion[];
+  analisisIa: AnalisisIa[];
   historial: HistorialEstado[];
 }
 
@@ -44,9 +70,14 @@ export function createInitialBackendStore(): BackendStore {
   return {
     empleados: structuredClone(SEED_EMPLEADOS),
     usuarios: structuredClone(SEED_USUARIOS),
+    tiposRecurso: structuredClone(SEED_TIPOS_RECURSO),
     recursos: structuredClone(SEED_RECURSOS),
+    categorias: structuredClone(SEED_CATEGORIAS),
+    prioridades: structuredClone(SEED_PRIORIDADES),
     solicitudes: structuredClone(SEED_SOLICITUDES),
+    evidencias: structuredClone(SEED_EVIDENCIAS),
     asignaciones: structuredClone(SEED_ASIGNACIONES),
+    analisisIa: structuredClone(SEED_ANALISIS_IA),
     historial: structuredClone(SEED_HISTORIAL),
   };
 }
@@ -620,12 +651,14 @@ export function createApiApp(customStore?: BackendStore) {
       }
 
       const nextId = Math.max(0, ...store.usuarios.map((u) => u.id)) + 1;
-      const passwordTemporal = `Temp${Math.floor(100000 + Math.random() * 899999)}a`;
+      const passwordInput = String(req.body?.password ?? '').trim();
+      const passwordTemporal =
+        passwordInput || `Temp${Math.floor(100000 + Math.random() * 899999)}a`;
       const nuevoUsuario: Usuario = {
         id: nextId,
         empleadoId,
         perfil,
-        password: passwordTemporal,
+        password: hashPassword(passwordTemporal),
         debeCambiarPassword: true,
         intentosFallidos: 0,
         bloqueadoHasta: null,
@@ -642,11 +675,25 @@ export function createApiApp(customStore?: BackendStore) {
           empleadoId: nuevoUsuario.empleadoId,
           perfil: nuevoUsuario.perfil,
           activo: nuevoUsuario.activo,
+          debeCambiarPassword: nuevoUsuario.debeCambiarPassword,
           passwordTemporal,
         },
       });
     }
   );
+
+  // Función auxiliar HU-03: Verifica si un técnico tiene solicitudes activas (Asignada o En proceso)
+  const obtenerSolicitudesActivasDeTecnico = (tecnicoId: number): Solicitud[] => {
+    const asignacionesVigentes = store.asignaciones.filter(
+      (a) => a.vigente && a.tecnicoId === tecnicoId
+    );
+    return asignacionesVigentes
+      .map((a) => store.solicitudes.find((s) => s.id === a.solicitudId))
+      .filter(
+        (s): s is Solicitud =>
+          !!s && (s.estado === 'Asignada' || s.estado === 'En proceso')
+      );
+  };
 
   app.put(
     '/api/admin/usuarios/:id',
@@ -681,6 +728,26 @@ export function createApiApp(customStore?: BackendStore) {
         }
       }
 
+      const nuevoEsTecnico =
+        typeof req.body?.esTecnico === 'boolean'
+          ? req.body.esTecnico
+          : nuevoPerfil === 'EMPLEADO' || (emp?.esTecnico && nuevoPerfil === 'ADMINISTRADOR');
+
+      if (emp && emp.esTecnico && (!nuevoEsTecnico || req.body?.activo === false)) {
+        const activas = obtenerSolicitudesActivasDeTecnico(emp.id);
+        if (activas.length > 0) {
+          res.status(400).json({
+            ok: false,
+            codigo: 'REGLA_NEGOCIO',
+            error: `El técnico tiene ${activas.length} solicitud(es) en estado Asignada o En proceso (${activas
+              .map((s) => s.codigo)
+              .join(', ')}). Reasígnelas antes de retirar su función técnica.`,
+            solicitudesActivas: activas.map((s) => s.codigo),
+          });
+          return;
+        }
+      }
+
       usr.perfil = nuevoPerfil;
       if (typeof req.body?.activo === 'boolean') {
         usr.activo = req.body.activo;
@@ -691,7 +758,7 @@ export function createApiApp(customStore?: BackendStore) {
         if (req.body?.apellidos) emp.apellidos = String(req.body.apellidos).trim();
         if (req.body?.correo) emp.correo = String(req.body.correo).trim().toLowerCase();
         if (req.body?.cargo) emp.cargo = String(req.body.cargo).trim();
-        emp.esTecnico = nuevoPerfil === 'EMPLEADO';
+        emp.esTecnico = Boolean(nuevoEsTecnico);
         emp.actualizadoEn = new Date().toISOString();
       }
 
@@ -705,6 +772,7 @@ export function createApiApp(customStore?: BackendStore) {
           apellidos: emp?.apellidos,
           correo: emp?.correo,
           cargo: emp?.cargo,
+          esTecnico: emp?.esTecnico,
         },
       });
     }
@@ -742,13 +810,33 @@ export function createApiApp(customStore?: BackendStore) {
         }
       }
 
-      usr.perfil = perfil;
       const emp = store.empleados.find((e) => e.id === usr.empleadoId);
-      if (emp) {
-        emp.esTecnico = perfil === 'EMPLEADO';
+      const nuevoEsTecnico =
+        typeof req.body?.esTecnico === 'boolean'
+          ? req.body.esTecnico
+          : perfil === 'EMPLEADO' || (emp?.esTecnico && perfil === 'ADMINISTRADOR');
+
+      if (emp && emp.esTecnico && !nuevoEsTecnico) {
+        const activas = obtenerSolicitudesActivasDeTecnico(emp.id);
+        if (activas.length > 0) {
+          res.status(400).json({
+            ok: false,
+            codigo: 'REGLA_NEGOCIO',
+            error: `No se puede retirar la función técnica mientras tenga solicitudes activas (${activas
+              .map((s) => s.codigo)
+              .join(', ')}). Reasígnelas primero.`,
+            solicitudesActivas: activas.map((s) => s.codigo),
+          });
+          return;
+        }
       }
 
-      res.json({ ok: true, data: { id: usr.id, perfil: usr.perfil } });
+      usr.perfil = perfil;
+      if (emp) {
+        emp.esTecnico = Boolean(nuevoEsTecnico);
+      }
+
+      res.json({ ok: true, data: { id: usr.id, perfil: usr.perfil, esTecnico: emp?.esTecnico } });
     }
   );
 
@@ -786,12 +874,316 @@ export function createApiApp(customStore?: BackendStore) {
     }
   );
 
+  // ============================================================================
+  // HU-01 y HU-03: Registro, Edición y Habilitación Técnica de Empleados
+  // ============================================================================
   app.get(
     '/api/admin/empleados',
     requireAuth,
     requireRole('ADMINISTRADOR'),
     (_req: Request, res: Response) => {
       res.json({ ok: true, data: store.empleados });
+    }
+  );
+
+  app.post(
+    '/api/admin/empleados',
+    requireAuth,
+    requireRole('ADMINISTRADOR'),
+    (req: Request, res: Response) => {
+      const documento = String(req.body?.documento ?? '').trim();
+      const nombres = String(req.body?.nombres ?? '').trim();
+      const apellidos = String(req.body?.apellidos ?? '').trim();
+      const correo = String(req.body?.correo ?? '').trim().toLowerCase();
+      const cargo = String(req.body?.cargo ?? '').trim();
+      const esTecnico = Boolean(req.body?.esTecnico);
+
+      if (!documento || !nombres || !apellidos || !correo || !cargo) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'VALIDACION',
+          error: 'Complete todos los campos obligatorios (documento, nombres, apellidos, correo, cargo).',
+        });
+        return;
+      }
+
+      if (store.empleados.some((e) => e.documento.toLowerCase() === documento.toLowerCase())) {
+        res.status(409).json({
+          ok: false,
+          codigo: 'DUPLICADO',
+          campo: 'documento',
+          error: 'Ya existe un empleado con este documento de identidad.',
+        });
+        return;
+      }
+
+      if (store.empleados.some((e) => e.correo.toLowerCase() === correo)) {
+        res.status(409).json({
+          ok: false,
+          codigo: 'DUPLICADO',
+          campo: 'correo',
+          error: 'Ya existe un empleado registrado con este correo electrónico.',
+        });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const nextId = Math.max(0, ...store.empleados.map((e) => e.id)) + 1;
+      const nuevo: Empleado = {
+        id: nextId,
+        documento,
+        nombres,
+        apellidos,
+        correo,
+        cargo,
+        esTecnico,
+        activo: true,
+        creadoEn: now,
+        actualizadoEn: now,
+      };
+      store.empleados.push(nuevo);
+      res.status(201).json({ ok: true, data: nuevo });
+    }
+  );
+
+  app.put(
+    '/api/admin/empleados/:id',
+    requireAuth,
+    requireRole('ADMINISTRADOR'),
+    (req: Request, res: Response) => {
+      const empleadoId = Number(req.params.id);
+      const emp = store.empleados.find((e) => e.id === empleadoId);
+      if (!emp) {
+        res.status(404).json({ ok: false, error: 'Empleado no encontrado.' });
+        return;
+      }
+
+      const documento = req.body?.documento !== undefined ? String(req.body.documento).trim() : emp.documento;
+      const nombres = req.body?.nombres !== undefined ? String(req.body.nombres).trim() : emp.nombres;
+      const apellidos = req.body?.apellidos !== undefined ? String(req.body.apellidos).trim() : emp.apellidos;
+      const correo = req.body?.correo !== undefined ? String(req.body.correo).trim().toLowerCase() : emp.correo;
+      const cargo = req.body?.cargo !== undefined ? String(req.body.cargo).trim() : emp.cargo;
+      const esTecnico = typeof req.body?.esTecnico === 'boolean' ? req.body.esTecnico : emp.esTecnico;
+      const activo = typeof req.body?.activo === 'boolean' ? req.body.activo : emp.activo;
+
+      if (store.empleados.some((e) => e.id !== emp.id && e.documento.toLowerCase() === documento.toLowerCase())) {
+        res.status(409).json({
+          ok: false,
+          codigo: 'DUPLICADO',
+          campo: 'documento',
+          error: 'Ya existe otro empleado con este documento de identidad.',
+        });
+        return;
+      }
+
+      if (store.empleados.some((e) => e.id !== emp.id && e.correo.toLowerCase() === correo)) {
+        res.status(409).json({
+          ok: false,
+          codigo: 'DUPLICADO',
+          campo: 'correo',
+          error: 'Ya existe otro empleado con este correo electrónico.',
+        });
+        return;
+      }
+
+      if (emp.esTecnico && (!esTecnico || !activo)) {
+        const activas = obtenerSolicitudesActivasDeTecnico(emp.id);
+        if (activas.length > 0) {
+          res.status(400).json({
+            ok: false,
+            codigo: 'REGLA_NEGOCIO',
+            error: `El técnico tiene ${activas.length} solicitud(es) en estado Asignada o En proceso (${activas
+              .map((s) => s.codigo)
+              .join(', ')}). Reasígnelas antes de retirar la marca técnica.`,
+            solicitudesActivas: activas.map((s) => s.codigo),
+          });
+          return;
+        }
+      }
+
+      emp.documento = documento;
+      emp.nombres = nombres;
+      emp.apellidos = apellidos;
+      emp.correo = correo;
+      emp.cargo = cargo;
+      emp.esTecnico = esTecnico;
+      emp.activo = activo;
+      emp.actualizadoEn = new Date().toISOString();
+
+      res.json({ ok: true, data: emp });
+    }
+  );
+
+  app.patch(
+    '/api/admin/empleados/:id/tecnico',
+    requireAuth,
+    requireRole('ADMINISTRADOR'),
+    (req: Request, res: Response) => {
+      const empleadoId = Number(req.params.id);
+      const emp = store.empleados.find((e) => e.id === empleadoId);
+      if (!emp) {
+        res.status(404).json({ ok: false, error: 'Empleado no encontrado.' });
+        return;
+      }
+
+      const nuevoValor =
+        typeof req.body?.esTecnico === 'boolean' ? req.body.esTecnico : !emp.esTecnico;
+
+      if (emp.esTecnico && !nuevoValor) {
+        const activas = obtenerSolicitudesActivasDeTecnico(emp.id);
+        if (activas.length > 0) {
+          res.status(400).json({
+            ok: false,
+            codigo: 'REGLA_NEGOCIO',
+            error: `No se puede retirar la función técnica mientras tenga solicitudes activas (${activas
+              .map((s) => s.codigo)
+              .join(', ')}). Reasígnelas antes de confirmar.`,
+            solicitudesActivas: activas.map((s) => s.codigo),
+          });
+          return;
+        }
+      }
+
+      emp.esTecnico = nuevoValor;
+      emp.actualizadoEn = new Date().toISOString();
+      res.json({ ok: true, data: emp });
+    }
+  );
+
+  // ============================================================================
+  // HU-04: Gestión del Catálogo de Recursos Físicos
+  // ============================================================================
+  app.get('/api/recursos', requireAuth, (_req: Request, res: Response) => {
+    res.json({ ok: true, data: store.recursos });
+  });
+
+  app.post(
+    '/api/admin/recursos',
+    requireAuth,
+    requireRole('ADMINISTRADOR'),
+    (req: Request, res: Response) => {
+      const codigo = String(req.body?.codigo ?? '').trim().toUpperCase();
+      const nombre = String(req.body?.nombre ?? '').trim();
+      const tipoRecursoId = Number(req.body?.tipoRecursoId);
+      const ubicacion = String(req.body?.ubicacion ?? '').trim();
+      const descripcion = String(req.body?.descripcion ?? '').trim();
+
+      if (!codigo || !nombre || !ubicacion || !tipoRecursoId) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'VALIDACION',
+          error: 'Código, nombre, ubicación y tipo de recurso son obligatorios.',
+        });
+        return;
+      }
+
+      const tipo = store.tiposRecurso.find((t) => t.id === tipoRecursoId);
+      if (!tipo) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'tipoRecursoId',
+          error: 'El recurso debe vincularse a una de las 4 tipologías canónicas.',
+        });
+        return;
+      }
+
+      if (store.recursos.some((r) => r.codigo.toUpperCase() === codigo)) {
+        res.status(409).json({
+          ok: false,
+          codigo: 'DUPLICADO',
+          campo: 'codigo',
+          error: 'Ya existe un recurso registrado con este código.',
+        });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const nextId = Math.max(0, ...store.recursos.map((r) => r.id)) + 1;
+      const nuevo: Recurso = {
+        id: nextId,
+        codigo,
+        nombre,
+        tipoRecursoId,
+        ubicacion,
+        descripcion,
+        activo: true,
+        creadoEn: now,
+        actualizadoEn: now,
+      };
+      store.recursos.push(nuevo);
+      res.status(201).json({ ok: true, data: nuevo });
+    }
+  );
+
+  app.put(
+    '/api/admin/recursos/:id',
+    requireAuth,
+    requireRole('ADMINISTRADOR'),
+    (req: Request, res: Response) => {
+      const recursoId = Number(req.params.id);
+      const rec = store.recursos.find((r) => r.id === recursoId);
+      if (!rec) {
+        res.status(404).json({ ok: false, error: 'Recurso no encontrado.' });
+        return;
+      }
+
+      if (req.body?.codigo) {
+        const cleanCod = String(req.body.codigo).trim().toUpperCase();
+        if (store.recursos.some((r) => r.id !== rec.id && r.codigo.toUpperCase() === cleanCod)) {
+          res.status(409).json({
+            ok: false,
+            codigo: 'DUPLICADO',
+            campo: 'codigo',
+            error: 'Ya existe otro recurso con este código.',
+          });
+          return;
+        }
+        rec.codigo = cleanCod;
+      }
+      if (req.body?.nombre) rec.nombre = String(req.body.nombre).trim();
+      if (req.body?.ubicacion) rec.ubicacion = String(req.body.ubicacion).trim();
+      if (req.body?.descripcion !== undefined) rec.descripcion = String(req.body.descripcion).trim();
+      if (req.body?.tipoRecursoId) {
+        const tipo = store.tiposRecurso.find((t) => t.id === Number(req.body.tipoRecursoId));
+        if (!tipo) {
+          res.status(400).json({ ok: false, codigo: 'VALIDACION', error: 'Tipología inválida.' });
+          return;
+        }
+        rec.tipoRecursoId = tipo.id;
+      }
+      if (typeof req.body?.activo === 'boolean') rec.activo = req.body.activo;
+      rec.actualizadoEn = new Date().toISOString();
+
+      res.json({ ok: true, data: rec });
+    }
+  );
+
+  app.delete(
+    '/api/admin/recursos/:id',
+    requireAuth,
+    requireRole('ADMINISTRADOR'),
+    (req: Request, res: Response) => {
+      const recursoId = Number(req.params.id);
+      const rec = store.recursos.find((r) => r.id === recursoId);
+      if (!rec) {
+        res.status(404).json({ ok: false, error: 'Recurso no encontrado.' });
+        return;
+      }
+
+      const tieneHistorial = store.solicitudes.some((s) => s.recursoId === recursoId);
+      if (tieneHistorial) {
+        res.status(409).json({
+          ok: false,
+          codigo: 'REGLA_NEGOCIO',
+          error:
+            'No se permite la eliminación física de un recurso con historial de solicitudes vinculadas. Utilice la inactivación lógica para resguardar la integridad histórica.',
+        });
+        return;
+      }
+
+      store.recursos = store.recursos.filter((r) => r.id !== recursoId);
+      res.json({ ok: true, mensaje: 'Recurso eliminado.' });
     }
   );
 
@@ -830,11 +1222,13 @@ export function createApiApp(customStore?: BackendStore) {
       }
 
       const now = new Date().toISOString();
+      let eraReasignacion = false;
       store.asignaciones.forEach((a) => {
         if (a.solicitudId === solicitudId && a.vigente) {
+          eraReasignacion = true;
           a.vigente = false;
           a.finalizadaEn = now;
-          a.motivoFin = 'Reasignación por Administrador';
+          a.motivoFin = String(req.body?.motivo ?? '').trim() || 'Reasignación por Administrador';
         }
       });
 
@@ -850,9 +1244,22 @@ export function createApiApp(customStore?: BackendStore) {
         motivoFin: null,
       });
 
+      const estadoAnterior = sol.estado;
       sol.estado = 'Asignada';
       sol.actualizadaEn = now;
       sol.version += 1;
+
+      store.historial.push({
+        id: Math.max(0, ...store.historial.map((h) => h.id)) + 1,
+        solicitudId: sol.id,
+        estadoAnterior,
+        estadoNuevo: 'Asignada',
+        usuarioId: req.auth!.usuario.id,
+        cambiadoEn: now,
+        motivo: eraReasignacion
+          ? `Reasignado a ${tecnico.nombres} ${tecnico.apellidos}`
+          : `Asignado a ${tecnico.nombres} ${tecnico.apellidos}`,
+      });
 
       res.json({ ok: true, data: sol });
     }
@@ -926,73 +1333,101 @@ export function createApiApp(customStore?: BackendStore) {
     }
   );
 
+  const procesarCambioEstadoSolicitud = (req: Request, res: Response) => {
+    const { usuario, empleado } = req.auth!;
+    const solicitudId = Number(req.params.id);
+    const destino = (req.body?.destino ?? req.body?.nuevoEstado) as EstadoNombre;
+    const motivo = String(req.body?.motivo ?? '').trim();
+
+    const sol = store.solicitudes.find((s) => s.id === solicitudId);
+    if (!sol) {
+      res.status(404).json({ ok: false, error: 'Solicitud no encontrada.' });
+      return;
+    }
+
+    const asig = store.asignaciones.find(
+      (a) => a.solicitudId === sol.id && a.vigente
+    );
+
+    if (!puedeVerSolicitud(usuario, empleado, sol, asig)) {
+      res.status(403).json({
+        ok: false,
+        codigo: 'ACCESO_DENEGADO',
+        error: 'No tiene permiso sobre esta solicitud.',
+      });
+      return;
+    }
+
+    const permitidas = obtenerTransicionesPermitidas(usuario, empleado, sol, asig);
+    const trans = permitidas.find((t) => t.destino === destino);
+    if (!trans) {
+      res.status(403).json({
+        ok: false,
+        codigo: 'TRANSICION_INVALIDA',
+        error: 'Transición de estado no permitida para su rol o estado actual.',
+      });
+      return;
+    }
+
+    // HU-14 y HU-15: Motivo obligatorio de mínimo 10 caracteres en Cancelada, Rechazada o Retiro de asignación
+    if (trans.requiereMotivo && motivo.length < 10) {
+      res.status(400).json({
+        ok: false,
+        codigo: 'VALIDACION',
+        campo: 'motivo',
+        error: 'El motivo es obligatorio y debe tener al menos 10 caracteres.',
+      });
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const anterior = sol.estado;
+    const cierra = esEstadoFinal(destino);
+    const retiraAsignacion = destino === 'Pendiente' || cierra;
+
+    sol.estado = destino;
+    sol.actualizadaEn = now;
+    if (destino === 'Finalizada' && motivo) {
+      sol.trabajoRealizado = motivo;
+      sol.trabajoActualizadoEn = now;
+    }
+    if (cierra) {
+      sol.cerradaEn = now;
+      sol.motivoCierre = motivo || sol.trabajoRealizado || `Estado cambiado a ${destino}`;
+    }
+    if (retiraAsignacion) {
+      store.asignaciones.forEach((a) => {
+        if (a.solicitudId === sol.id && a.vigente) {
+          a.vigente = false;
+          a.finalizadaEn = now;
+          a.motivoFin = motivo || `Estado cambiado a ${destino}`;
+        }
+      });
+    }
+    sol.version += 1;
+
+    store.historial.push({
+      id: Math.max(0, ...store.historial.map((h) => h.id)) + 1,
+      solicitudId: sol.id,
+      estadoAnterior: anterior,
+      estadoNuevo: destino,
+      usuarioId: usuario.id,
+      cambiadoEn: now,
+      motivo: motivo || null,
+    });
+
+    res.json({ ok: true, data: sol });
+  };
+
   app.patch(
     '/api/tecnico/solicitudes/:id/estado',
     requireAuth,
     requireRole('ADMINISTRADOR', 'EMPLEADO'),
-    (req: Request, res: Response) => {
-      const { usuario, empleado } = req.auth!;
-      const solicitudId = Number(req.params.id);
-      const destino = req.body?.destino as EstadoNombre;
-      const motivo = String(req.body?.motivo ?? '').trim();
-
-      const sol = store.solicitudes.find((s) => s.id === solicitudId);
-      if (!sol) {
-        res.status(404).json({ ok: false, error: 'Solicitud no encontrada.' });
-        return;
-      }
-
-      const asig = store.asignaciones.find(
-        (a) => a.solicitudId === sol.id && a.vigente
-      );
-
-      if (!puedeVerSolicitud(usuario, empleado, sol, asig)) {
-        res.status(403).json({
-          ok: false,
-          codigo: 'ACCESO_DENEGADO',
-          error: 'No tiene permiso sobre esta solicitud.',
-        });
-        return;
-      }
-
-      const permitidas = obtenerTransicionesPermitidas(usuario, empleado, sol, asig);
-      const trans = permitidas.find((t) => t.destino === destino);
-      if (!trans) {
-        res.status(403).json({
-          ok: false,
-          codigo: 'TRANSICION_INVALIDA',
-          error: 'Transición de estado no permitida para su rol.',
-        });
-        return;
-      }
-
-      const now = new Date().toISOString();
-      const anterior = sol.estado;
-      sol.estado = destino;
-      sol.actualizadaEn = now;
-      if (motivo) {
-        sol.trabajoRealizado = motivo;
-        sol.trabajoActualizadoEn = now;
-      }
-      if (destino === 'Finalizada') {
-        sol.cerradaEn = now;
-        sol.motivoCierre = motivo || sol.trabajoRealizado || 'Reparación finalizada.';
-      }
-      sol.version += 1;
-
-      store.historial.push({
-        id: Math.max(0, ...store.historial.map((h) => h.id)) + 1,
-        solicitudId: sol.id,
-        estadoAnterior: anterior,
-        estadoNuevo: destino,
-        usuarioId: usuario.id,
-        cambiadoEn: now,
-        motivo: motivo || null,
-      });
-
-      res.json({ ok: true, data: sol });
-    }
+    procesarCambioEstadoSolicitud
   );
+
+  // HU-12, HU-13, HU-14, HU-15: Endpoint unificado de transición de estado (incluye cancelación de CLIENTE en Pendiente)
+  app.patch('/api/solicitudes/:id/estado', requireAuth, procesarCambioEstadoSolicitud);
 
   // ============================================================================
   // Rutas de Solicitudes (/api/solicitudes/*)
@@ -1073,15 +1508,33 @@ export function createApiApp(customStore?: BackendStore) {
         return;
       }
 
+      let solicitanteId = empleado.id;
+      let motivoInicial: string | null = 'Radicación inicial de solicitud';
+      if (usuario.perfil === 'ADMINISTRADOR' && req.body?.solicitanteId) {
+        const targetEmp = store.empleados.find(
+          (e) => e.id === Number(req.body.solicitanteId) && e.activo
+        );
+        if (!targetEmp) {
+          res.status(400).json({
+            ok: false,
+            codigo: 'VALIDACION',
+            campo: 'solicitanteId',
+            error: 'El empleado solicitante seleccionado no existe o está inactivo.',
+          });
+          return;
+        }
+        solicitanteId = targetEmp.id;
+        if (targetEmp.id !== empleado.id) {
+          motivoInicial = `Registrada por ${empleado.nombres} ${empleado.apellidos} a nombre de ${targetEmp.nombres} ${targetEmp.apellidos}`;
+        }
+      }
+
       const now = new Date().toISOString();
       const nextId = Math.max(0, ...store.solicitudes.map((s) => s.id)) + 1;
       const nueva: Solicitud = {
         id: nextId,
         codigo: generarCodigoSolicitud(nextId),
-        solicitanteId:
-          usuario.perfil === 'ADMINISTRADOR' && req.body?.solicitanteId
-            ? Number(req.body.solicitanteId)
-            : empleado.id,
+        solicitanteId,
         registradaPorUsuarioId: usuario.id,
         recursoId: rec.id,
         descripcion,
@@ -1098,12 +1551,415 @@ export function createApiApp(customStore?: BackendStore) {
       };
       store.solicitudes.unshift(nueva);
 
+      // HU-20: Registrar evento inicial en el historial forense de estados
+      store.historial.push({
+        id: Math.max(0, ...store.historial.map((h) => h.id)) + 1,
+        solicitudId: nueva.id,
+        estadoAnterior: null,
+        estadoNuevo: 'Pendiente',
+        usuarioId: usuario.id,
+        cambiadoEn: now,
+        motivo: motivoInicial,
+      });
+
+      // HU-16 y HU-17: Disparo automático del análisis de IA (v1) validado contra catálogos oficiales
+      const inferencia = generarInferenciaAnalisisIa(
+        nueva.descripcion,
+        rec.nombre,
+        rec.codigo,
+        0,
+        store.categorias,
+        store.prioridades
+      );
+      store.analisisIa.push({
+        id: Math.max(0, ...store.analisisIa.map((a) => a.id)) + 1,
+        solicitudId: nueva.id,
+        version: 1,
+        estadoAnalisis: 'COMPLETADO',
+        tipoDano: inferencia.tipoDano,
+        descripcionObservada: inferencia.descripcionObservada,
+        categoriaSugeridaId: inferencia.categoriaSugeridaId,
+        prioridadSugeridaId: inferencia.prioridadSugeridaId,
+        modelo: inferencia.modelo,
+        solicitadoPorUsuarioId: usuario.id,
+        creadoEn: now,
+        completadoEn: now,
+        errorDetalle: null,
+        decisionRevision: 'PENDIENTE',
+        revisadoPorUsuarioId: null,
+        revisadoEn: null,
+      });
+
       res.status(201).json({
         ok: true,
         data: sanitizarSolicitudParaRol(nueva, usuario.perfil),
       });
     }
   );
+
+  // ============================================================================
+  // HU-07 y HU-10: Adjunción, Validación Binaria, SHA-256 y Descarga Protegida de Evidencias
+  // ============================================================================
+  app.post('/api/solicitudes/:id/evidencias', requireAuth, (req: Request, res: Response) => {
+    const { usuario, empleado } = req.auth!;
+    const solicitudId = Number(req.params.id);
+    const sol = store.solicitudes.find((s) => s.id === solicitudId);
+    if (!sol) {
+      res.status(404).json({ ok: false, error: 'Solicitud no encontrada.' });
+      return;
+    }
+
+    const asig = store.asignaciones.find((a) => a.solicitudId === sol.id && a.vigente);
+    if (!puedeAdjuntarEvidencia(usuario, empleado, sol, asig)) {
+      res.status(403).json({
+        ok: false,
+        codigo: 'ACCESO_DENEGADO',
+        error: 'No tiene permisos para adjuntar evidencias a esta solicitud.',
+      });
+      return;
+    }
+
+    const nombreOriginal = String(req.body?.nombreOriginal ?? '').trim();
+    const dataUrl = String(req.body?.dataUrl ?? '').trim();
+    const tamanoBytes = Number(req.body?.tamanoBytes ?? 0);
+
+    if (!nombreOriginal || !dataUrl || tamanoBytes <= 0) {
+      res.status(400).json({
+        ok: false,
+        codigo: 'VALIDACION',
+        error: 'Debe proporcionar nombreOriginal, dataUrl (contenido binario base64) y tamanoBytes.',
+      });
+      return;
+    }
+
+    const firmaCheck = verificarFirmaBinariaEvidencia(dataUrl, nombreOriginal);
+    if (!firmaCheck.ok) {
+      res.status(400).json({
+        ok: false,
+        codigo: 'FIRMA_BINARIA_INVALIDA',
+        error: firmaCheck.error,
+      });
+      return;
+    }
+
+    const existentes = store.evidencias.filter((e) => e.solicitudId === solicitudId);
+    const fotosCount = existentes.filter((e) => e.tipo === 'FOTOGRAFIA').length;
+    const pdfsCount = existentes.filter((e) => e.tipo === 'PDF').length;
+
+    if (firmaCheck.tipo === 'FOTOGRAFIA') {
+      if (fotosCount >= MAX_FOTOS) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'CUOTA_EXCEDIDA',
+          error: `Máximo ${MAX_FOTOS} fotografías por solicitud.`,
+        });
+        return;
+      }
+      if (tamanoBytes > MAX_FOTO_BYTES) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'TAMANO_EXCEDIDO',
+          error: 'La fotografía supera el límite máximo de 5 MB.',
+        });
+        return;
+      }
+    } else {
+      if (pdfsCount >= MAX_PDFS) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'CUOTA_EXCEDIDA',
+          error: `Máximo ${MAX_PDFS} documentos PDF por solicitud.`,
+        });
+        return;
+      }
+      if (tamanoBytes > MAX_PDF_BYTES) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'TAMANO_EXCEDIDO',
+          error: 'El documento PDF supera el límite máximo de 10 MB.',
+        });
+        return;
+      }
+    }
+
+    const hashSha256 = calcularHashSha256(dataUrl);
+    const now = new Date().toISOString();
+    const nextId = Math.max(0, ...store.evidencias.map((e) => e.id)) + 1;
+    const nuevaEvidencia: Evidencia = {
+      id: nextId,
+      solicitudId,
+      tipo: firmaCheck.tipo,
+      nombreOriginal,
+      nombreAlmacenado: `ev-${solicitudId}-${Date.now()}-${nextId}`,
+      tipoMime: firmaCheck.mimeReal,
+      tamanoBytes,
+      hashSha256,
+      subidaPorUsuarioId: usuario.id,
+      subidaEn: now,
+      dataUrl,
+    };
+
+    store.evidencias.push(nuevaEvidencia);
+    res.status(201).json({ ok: true, data: nuevaEvidencia });
+  });
+
+  const procesarDescargaEvidencia = (req: Request, res: Response) => {
+    const { usuario, empleado } = req.auth!;
+    const evidenciaId = Number(req.params.evidenciaId ?? req.params.id);
+    const ev = store.evidencias.find((e) => e.id === evidenciaId);
+    if (!ev) {
+      res.status(404).json({ ok: false, error: 'Evidencia no encontrada.' });
+      return;
+    }
+
+    const sol = store.solicitudes.find((s) => s.id === ev.solicitudId);
+    if (!sol) {
+      res.status(404).json({ ok: false, error: 'Solicitud asociada no encontrada.' });
+      return;
+    }
+
+    const asig = store.asignaciones.find((a) => a.solicitudId === sol.id && a.vigente);
+    if (!puedeVerSolicitud(usuario, empleado, sol, asig)) {
+      res.status(403).json({
+        ok: false,
+        codigo: 'ACCESO_DENEGADO',
+        error: 'Acceso denegado: no tiene permisos para inspeccionar ni descargar evidencias de este expediente.',
+      });
+      return;
+    }
+
+    res.json({
+      ok: true,
+      auditadoPorUsuarioId: usuario.id,
+      auditadoEn: new Date().toISOString(),
+      data: ev,
+    });
+  };
+
+  app.get('/api/solicitudes/:id/evidencias/:evidenciaId/descargar', requireAuth, procesarDescargaEvidencia);
+  app.get('/api/evidencias/:evidenciaId/descargar', requireAuth, procesarDescargaEvidencia);
+
+  // ============================================================================
+  // HU-16, HU-17 y HU-18: Análisis Asistido por IA, Validación de Catálogo y Revisión Humana
+  // ============================================================================
+  app.get('/api/solicitudes/:id/analisis-ia', requireAuth, (req: Request, res: Response) => {
+    const { usuario, empleado } = req.auth!;
+    const solicitudId = Number(req.params.id);
+    const sol = store.solicitudes.find((s) => s.id === solicitudId);
+    if (!sol) {
+      res.status(404).json({ ok: false, error: 'Solicitud no encontrada.' });
+      return;
+    }
+
+    const asig = store.asignaciones.find((a) => a.solicitudId === sol.id && a.vigente);
+    if (!puedeVerSolicitud(usuario, empleado, sol, asig)) {
+      res.status(403).json({
+        ok: false,
+        codigo: 'ACCESO_DENEGADO',
+        error: 'No tiene permisos para consultar el análisis de IA de esta solicitud.',
+      });
+      return;
+    }
+
+    const versiones = store.analisisIa
+      .filter((a) => a.solicitudId === solicitudId)
+      .sort((a, b) => b.version - a.version);
+    res.json({ ok: true, data: versiones });
+  });
+
+  app.post(
+    '/api/admin/solicitudes/:id/analisis-ia',
+    requireAuth,
+    requireRole('ADMINISTRADOR'),
+    (req: Request, res: Response) => {
+      const { usuario } = req.auth!;
+      const solicitudId = Number(req.params.id);
+      const sol = store.solicitudes.find((s) => s.id === solicitudId);
+      if (!sol) {
+        res.status(404).json({ ok: false, error: 'Solicitud no encontrada.' });
+        return;
+      }
+
+      const rec = store.recursos.find((r) => r.id === sol.recursoId);
+      const evsCount = store.evidencias.filter((e) => e.solicitudId === sol.id).length;
+      const prevVersiones = store.analisisIa.filter((a) => a.solicitudId === solicitudId);
+      const nextVersion = Math.max(0, ...prevVersiones.map((a) => a.version)) + 1;
+      const nextId = Math.max(0, ...store.analisisIa.map((a) => a.id)) + 1;
+      const now = new Date().toISOString();
+
+      if (req.body?.simularFallo) {
+        const analisisFallido: AnalisisIa = {
+          id: nextId,
+          solicitudId,
+          version: nextVersion,
+          estadoAnalisis: 'FALLIDO',
+          tipoDano: null,
+          descripcionObservada: null,
+          categoriaSugeridaId: null,
+          prioridadSugeridaId: null,
+          modelo: 'gemini-2.5-flash',
+          solicitadoPorUsuarioId: usuario.id,
+          creadoEn: now,
+          completadoEn: now,
+          errorDetalle:
+            String(req.body?.errorDetalle ?? '').trim() ||
+            'Tiempo de espera agotado al contactar al servicio externo de IA.',
+          decisionRevision: 'PENDIENTE',
+          revisadoPorUsuarioId: null,
+          revisadoEn: null,
+        };
+        store.analisisIa.push(analisisFallido);
+        res.status(201).json({ ok: true, data: analisisFallido });
+        return;
+      }
+
+      const inferencia = generarInferenciaAnalisisIa(
+        sol.descripcion,
+        rec?.nombre ?? '',
+        rec?.codigo ?? '',
+        evsCount,
+        store.categorias,
+        store.prioridades,
+        req.body?.sugerenciaExterna
+      );
+
+      const nuevoAnalisis: AnalisisIa = {
+        id: nextId,
+        solicitudId,
+        version: nextVersion,
+        estadoAnalisis: 'COMPLETADO',
+        tipoDano: inferencia.tipoDano,
+        descripcionObservada: inferencia.descripcionObservada,
+        categoriaSugeridaId: inferencia.categoriaSugeridaId,
+        prioridadSugeridaId: inferencia.prioridadSugeridaId,
+        modelo: inferencia.modelo,
+        solicitadoPorUsuarioId: usuario.id,
+        creadoEn: now,
+        completadoEn: now,
+        errorDetalle: null,
+        decisionRevision: 'PENDIENTE',
+        revisadoPorUsuarioId: null,
+        revisadoEn: null,
+      };
+      store.analisisIa.push(nuevoAnalisis);
+      res.status(201).json({ ok: true, data: nuevoAnalisis });
+    }
+  );
+
+  app.post(
+    '/api/admin/solicitudes/:id/analisis-ia/:analisisId/revisar',
+    requireAuth,
+    requireRole('ADMINISTRADOR'),
+    (req: Request, res: Response) => {
+      const { usuario } = req.auth!;
+      if (!puedeRevisarIa(usuario)) {
+        res.status(403).json({ ok: false, codigo: 'ACCESO_DENEGADO', error: 'Acceso denegado.' });
+        return;
+      }
+
+      const solicitudId = Number(req.params.id);
+      const analisisId = Number(req.params.analisisId);
+      const decision = req.body?.decision as Exclude<DecisionRevisionIa, 'PENDIENTE'>;
+
+      if (!['ACEPTADO', 'MODIFICADO', 'DESCARTADO'].includes(decision)) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'VALIDACION',
+          error: 'Decisión inválida. Use ACEPTADO, MODIFICADO o DESCARTADO.',
+        });
+        return;
+      }
+
+      const sol = store.solicitudes.find((s) => s.id === solicitudId);
+      const analisis = store.analisisIa.find(
+        (a) => a.id === analisisId && a.solicitudId === solicitudId
+      );
+      if (!sol || !analisis) {
+        res.status(404).json({ ok: false, error: 'Solicitud o análisis de IA no encontrado.' });
+        return;
+      }
+
+      if (decision === 'ACEPTADO') {
+        sol.categoriaId = analisis.categoriaSugeridaId;
+        sol.prioridadId = analisis.prioridadSugeridaId;
+      } else if (decision === 'MODIFICADO') {
+        const catId = Number(req.body?.categoriaId);
+        const prioId = Number(req.body?.prioridadId);
+        const catValida = store.categorias.find((c) => c.id === catId && c.activa);
+        const prioValida = store.prioridades.find((p) => p.id === prioId);
+        if (!catValida || !prioValida) {
+          res.status(400).json({
+            ok: false,
+            codigo: 'VALIDACION',
+            error: 'Seleccione una categoría activa y una prioridad válidas del catálogo.',
+          });
+          return;
+        }
+        sol.categoriaId = catValida.id;
+        sol.prioridadId = prioValida.id;
+      } else if (decision === 'DESCARTADO') {
+        sol.categoriaId = null;
+        sol.prioridadId = null;
+      }
+
+      const now = new Date().toISOString();
+      analisis.decisionRevision = decision;
+      analisis.revisadoPorUsuarioId = usuario.id;
+      analisis.revisadoEn = now;
+      sol.actualizadaEn = now;
+      sol.version += 1;
+
+      res.json({
+        ok: true,
+        data: {
+          solicitud: sol,
+          analisis,
+        },
+      });
+    }
+  );
+
+  // ============================================================================
+  // HU-20: Trazabilidad y Consulta del Historial Cronológico de Estados
+  // ============================================================================
+  app.get('/api/solicitudes/:id/historial', requireAuth, (req: Request, res: Response) => {
+    const { usuario, empleado } = req.auth!;
+    const solicitudId = Number(req.params.id);
+    const sol = store.solicitudes.find((s) => s.id === solicitudId);
+    if (!sol) {
+      res.status(404).json({ ok: false, error: 'Solicitud no encontrada.' });
+      return;
+    }
+
+    const asig = store.asignaciones.find((a) => a.solicitudId === sol.id && a.vigente);
+    if (!puedeVerSolicitud(usuario, empleado, sol, asig)) {
+      res.status(403).json({
+        ok: false,
+        codigo: 'ACCESO_DENEGADO',
+        error: 'No tiene permisos para consultar el historial de esta solicitud.',
+      });
+      return;
+    }
+
+    const bitacora = store.historial
+      .filter((h) => h.solicitudId === solicitudId)
+      .sort((a, b) => new Date(a.cambiadoEn).getTime() - new Date(b.cambiadoEn).getTime())
+      .map((h) => {
+        const usrActuante = store.usuarios.find((u) => u.id === h.usuarioId);
+        const empActuante = usrActuante
+          ? store.empleados.find((e) => e.id === usrActuante.empleadoId)
+          : undefined;
+        return {
+          ...h,
+          usuarioNombre: empActuante
+            ? `${empActuante.nombres} ${empActuante.apellidos}`
+            : 'Sistema',
+          usuarioPerfil: usrActuante?.perfil ?? null,
+        };
+      });
+
+    res.json({ ok: true, data: bitacora });
+  });
 
   // Manejador global de errores del servidor sin exponer trazas ni detalles internos
   app.use((_err: unknown, _req: Request, res: Response, _next: NextFunction) => {

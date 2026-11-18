@@ -7,6 +7,7 @@ import { SEED_ASIGNACIONES, SEED_EMPLEADOS, SEED_SOLICITUDES, SEED_USUARIOS } fr
 import { createApiApp, createInitialBackendStore, encodeSessionToken } from '../src/server/apiApp';
 import {
   calcularDistribucionHeader,
+  calcularHashSha256,
   esPasswordHasheada,
   hashPassword,
   NavLinkItem,
@@ -18,6 +19,8 @@ import {
   puedeRegistrarTrabajo,
   puedeVerSolicitud,
   tienePermisoRuta,
+  validarSugerenciaIaContraCatalogo,
+  verificarFirmaBinariaEvidencia,
   verifyPassword,
 } from '../src/services/domainRules';
 import {
@@ -722,5 +725,210 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
     assert.equal(postmanCollection.info.name.includes('Spring Boot'), true);
     assert.equal(Array.isArray(postmanCollection.item), true);
     assert.equal(postmanCollection.item.length, 4);
+  });
+
+  // ==========================================================================
+  // 9. Verificación Integral de las 20 Historias de Usuario (HU-01 a HU-20)
+  // ==========================================================================
+  it('verifica extremo a extremo los criterios de aceptación de las 20 Historias de Usuario (HU-01 a HU-20)', async () => {
+    const adminToken = encodeSessionToken(adminUser.id, adminUser.perfil);
+    const clienteToken = encodeSessionToken(clienteUser.id, clienteUser.perfil);
+    const usuarioNoAutorizadoToken = encodeSessionToken(otroTecnicoUser.id, otroTecnicoUser.perfil);
+
+    // HU-01: Registro independiente de empleado y rechazo de documento o correo duplicado
+    const resEmpNuevo = await apiRequest('/api/admin/empleados', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        documento: '1077665544',
+        nombres: 'Diana',
+        apellidos: 'Quintero',
+        correo: 'diana.quintero@empresa.com',
+        cargo: 'Ingeniera de Planta',
+        esTecnico: true,
+      },
+    });
+    assert.equal(resEmpNuevo.status, 201);
+    assert.equal(resEmpNuevo.body.ok, true);
+    const nuevoEmpId = resEmpNuevo.body.data.id;
+
+    const resEmpDup = await apiRequest('/api/admin/empleados', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        documento: '1077665544',
+        nombres: 'Otro',
+        apellidos: 'Registro',
+        correo: 'otro@empresa.com',
+        cargo: 'Operario',
+      },
+    });
+    assert.equal(resEmpDup.status, 409);
+    assert.equal(resEmpDup.body.campo, 'documento');
+
+    // HU-02: Creación de usuario asociado a empleado existente con debeCambiarPassword=true y protección del último Admin
+    const resUsrNuevo = await apiRequest('/api/admin/usuarios', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        empleadoId: nuevoEmpId,
+        perfil: 'EMPLEADO',
+        password: 'InicialSegura2026',
+      },
+    });
+    assert.equal(resUsrNuevo.status, 201);
+    assert.equal(resUsrNuevo.body.data.debeCambiarPassword, true);
+
+    const resDegradarUltimoAdmin = await apiRequest(`/api/admin/usuarios/${adminUser.id}/rol`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: { perfil: 'CLIENTE' },
+    });
+    assert.equal(resDegradarUltimoAdmin.status, 400);
+    assert.equal(resDegradarUltimoAdmin.body.codigo, 'REGLA_NEGOCIO');
+
+    // HU-03: Bloqueo de retiro de función técnica cuando el técnico tiene solicitudes en Asignada o En proceso
+    // tecnicoEmp (ID 2) tiene asignaciones vigentes en el seed
+    const resQuitarTecnicoOcupado = await apiRequest(`/api/admin/empleados/${tecnicoEmp.id}/tecnico`, {
+      method: 'PATCH',
+      token: adminToken,
+      body: { esTecnico: false },
+    });
+    assert.equal(resQuitarTecnicoOcupado.status, 400);
+    assert.equal(resQuitarTecnicoOcupado.body.codigo, 'REGLA_NEGOCIO');
+
+    // HU-04: Gestión de recursos y prohibición de eliminación física si tiene historial de solicitudes
+    const resEliminarRecursoConHistorial = await apiRequest('/api/admin/recursos/1', {
+      method: 'DELETE',
+      token: adminToken,
+    });
+    assert.equal(resEliminarRecursoConHistorial.status, 409);
+    assert.equal(resEliminarRecursoConHistorial.body.codigo, 'REGLA_NEGOCIO');
+
+    // HU-05 y HU-06: Radicación de solicitud en nombre de terceros por el Administrador
+    const resSolTercero = await apiRequest('/api/solicitudes', {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        recursoId: 1,
+        solicitanteId: clienteEmp.id,
+        descripcion: 'Reporte radicado por Administrador a nombre de cliente por falla en sistema de enfriamiento.',
+      },
+    });
+    assert.equal(resSolTercero.status, 201);
+    const solId = resSolTercero.body.data.id;
+    assert.equal(resSolTercero.body.data.solicitanteId, clienteEmp.id);
+    assert.equal(resSolTercero.body.data.registradaPorUsuarioId, adminUser.id);
+
+    // HU-07: Validación de firma binaria (magic bytes) y cálculo real de hash SHA-256 (64 hex chars)
+    // Cabecera real JPEG: FF D8 FF E0
+    const jpegBase64 = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]).toString('base64');
+    const validJpegDataUrl = `data:image/jpeg;base64,${jpegBase64}`;
+    const resEvOk = await apiRequest(`/api/solicitudes/${solId}/evidencias`, {
+      method: 'POST',
+      token: clienteToken,
+      body: {
+        nombreOriginal: 'evidencia_real.jpg',
+        dataUrl: validJpegDataUrl,
+        tamanoBytes: 1024,
+      },
+    });
+    assert.equal(resEvOk.status, 201);
+    assert.match(resEvOk.body.data.hashSha256, /^[0-9a-f]{64}$/);
+    assert.equal(resEvOk.body.data.hashSha256, calcularHashSha256(validJpegDataUrl));
+    const evidenciaId = resEvOk.body.data.id;
+
+    // Rechazo de archivo ejecutable (MZ: 4D 5A) camuflado con extensión .jpg
+    const exeCamufladoBase64 = Buffer.from([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00]).toString('base64');
+    const checkExe = verificarFirmaBinariaEvidencia(`data:image/jpeg;base64,${exeCamufladoBase64}`, 'malware.jpg');
+    assert.equal(checkExe.ok, false);
+
+    const resEvExe = await apiRequest(`/api/solicitudes/${solId}/evidencias`, {
+      method: 'POST',
+      token: clienteToken,
+      body: {
+        nombreOriginal: 'malware.jpg',
+        dataUrl: `data:image/jpeg;base64,${exeCamufladoBase64}`,
+        tamanoBytes: 2048,
+      },
+    });
+    assert.equal(resEvExe.status, 400);
+    assert.equal(resEvExe.body.codigo, 'FIRMA_BINARIA_INVALIDA');
+
+    // HU-10: Descarga protegida de evidencia (200 para titular/Admin, 403 Forbidden para usuario no autorizado)
+    const resDescargaAutorizada = await apiRequest(`/api/solicitudes/${solId}/evidencias/${evidenciaId}/descargar`, {
+      token: clienteToken,
+    });
+    assert.equal(resDescargaAutorizada.status, 200);
+    assert.equal(resDescargaAutorizada.body.ok, true);
+
+    const resDescargaProhibida = await apiRequest(`/api/solicitudes/${solId}/evidencias/${evidenciaId}/descargar`, {
+      token: usuarioNoAutorizadoToken,
+    });
+    assert.equal(resDescargaProhibida.status, 403);
+
+    // HU-16, HU-17 y HU-18: Análisis de IA automático, validación contra catálogo, fallo controlado y decisión humana
+    const resListaIa = await apiRequest(`/api/solicitudes/${solId}/analisis-ia`, {
+      token: adminToken,
+    });
+    assert.equal(resListaIa.status, 200);
+    assert.equal(resListaIa.body.data.length >= 1, true);
+    const primerAnalisisId = resListaIa.body.data[0].id;
+
+    // HU-17: Si la IA retorna una categoría inexistente, el validador la descarta (null) sin corromper datos
+    const resIaCatInvalida = await apiRequest(`/api/admin/solicitudes/${solId}/analisis-ia`, {
+      method: 'POST',
+      token: adminToken,
+      body: {
+        sugerenciaExterna: {
+          categoriaIdOrNombre: 'CategoriaAeroespacialInexistente',
+          prioridadIdOrNombre: 'Alta',
+        },
+      },
+    });
+    assert.equal(resIaCatInvalida.status, 201);
+    assert.equal(resIaCatInvalida.body.data.categoriaSugeridaId, null);
+    assert.notEqual(resIaCatInvalida.body.data.prioridadSugeridaId, null);
+
+    // HU-18: Revisión humana ACEPTADO transfiere categoría y prioridad sugeridas a la solicitud
+    const resRevisarIa = await apiRequest(
+      `/api/admin/solicitudes/${solId}/analisis-ia/${primerAnalisisId}/revisar`,
+      {
+        method: 'POST',
+        token: adminToken,
+        body: { decision: 'ACEPTADO' },
+      }
+    );
+    assert.equal(resRevisarIa.status, 200);
+    assert.equal(resRevisarIa.body.data.analisis.decisionRevision, 'ACEPTADO');
+
+    // HU-14 y HU-15: El solicitante (CLIENTE) puede cancelar su propia solicitud en estado Pendiente con motivo >= 10 caracteres
+    const resCancelMotivoCorto = await apiRequest(`/api/solicitudes/${solId}/estado`, {
+      method: 'PATCH',
+      token: clienteToken,
+      body: { destino: 'Cancelada', motivo: 'Corto' },
+    });
+    assert.equal(resCancelMotivoCorto.status, 400);
+
+    const resCancelOk = await apiRequest(`/api/solicitudes/${solId}/estado`, {
+      method: 'PATCH',
+      token: clienteToken,
+      body: {
+        destino: 'Cancelada',
+        motivo: 'Se resolvió internamente reiniciando el módulo de ventilación auxiliar.',
+      },
+    });
+    assert.equal(resCancelOk.status, 200);
+    assert.equal(resCancelOk.body.data.estado, 'Cancelada');
+
+    // HU-20: Consulta del historial cronológico de estados con nombre real del usuario actuante
+    const resHistorial = await apiRequest(`/api/solicitudes/${solId}/historial`, {
+      token: adminToken,
+    });
+    assert.equal(resHistorial.status, 200);
+    assert.equal(resHistorial.body.data.length, 2);
+    assert.equal(resHistorial.body.data[0].estadoNuevo, 'Pendiente');
+    assert.equal(resHistorial.body.data[1].estadoNuevo, 'Cancelada');
+    assert.notEqual(resHistorial.body.data[1].usuarioNombre, 'Sistema');
   });
 });

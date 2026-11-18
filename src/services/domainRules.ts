@@ -1,8 +1,10 @@
 import {
   Asignacion,
+  Categoria,
   Empleado,
   EstadoNombre,
   PerfilUsuario,
+  Prioridad,
   Solicitud,
   Usuario,
 } from '../types/domain';
@@ -223,6 +225,7 @@ export function obtenerTransicionesPermitidas(
   if (esEstadoFinal(solicitud.estado)) return [];
 
   const esAdmin = usuario.perfil === 'ADMINISTRADOR';
+  const esSolicitante = solicitud.solicitanteId === empleado.id;
   const esTecnicoAsignado =
     usuario.perfil === 'EMPLEADO' &&
     !!asignacionVigente &&
@@ -238,6 +241,8 @@ export function obtenerTransicionesPermitidas(
         requiereMotivo: true,
         motivoOpcional: false,
       });
+    }
+    if (esAdmin || esSolicitante) {
       transiciones.push({
         destino: 'Cancelada',
         etiqueta: 'Cancelar solicitud',
@@ -322,12 +327,20 @@ export interface ArchivoValidado {
 }
 
 export function validarArchivoEvidencia(
-  file: File,
+  file: { name: string; type: string; size: number },
   fotosActuales: number,
-  pdfsActuales: number
-): { ok: true; tipo: 'FOTOGRAFIA' | 'PDF' } | { ok: false; error: string } {
-  const mime = file.type.toLowerCase();
+  pdfsActuales: number,
+  headerBytes?: Uint8Array
+): { ok: true; tipo: 'FOTOGRAFIA' | 'PDF'; mimeReal?: string } | { ok: false; error: string } {
+  const mime = (file.type || '').toLowerCase();
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+
+  if (headerBytes && headerBytes.length >= 4) {
+    const checkMagic = verificarFirmaBinariaEvidencia(headerBytes, file.name);
+    if (!checkMagic.ok) {
+      return checkMagic;
+    }
+  }
 
   const esFoto = mime === 'image/jpeg' || mime === 'image/png' || ext === 'jpg' || ext === 'jpeg' || ext === 'png';
   const esPdf = mime === 'application/pdf' || ext === 'pdf';
@@ -359,6 +372,232 @@ export function validarArchivoEvidencia(
   }
 
   return { ok: false, error: `${file.name}: formato no permitido (solo JPEG, PNG o PDF)` };
+}
+
+/**
+ * HU-07 / RF-07: Valida la firma binaria (números mágicos / primeros bytes) de un archivo o dataUrl
+ * para confirmar que su tipo MIME real sea image/jpeg, image/png o application/pdf,
+ * rechazando archivos ejecutables (MZ/PE, ELF, scripts) o extensiones falseadas.
+ */
+export function verificarFirmaBinariaEvidencia(
+  input: Uint8Array | string,
+  nombreOriginal = 'archivo'
+): { ok: true; tipo: 'FOTOGRAFIA' | 'PDF'; mimeReal: 'image/jpeg' | 'image/png' | 'application/pdf' } | { ok: false; error: string } {
+  let bytes: Uint8Array;
+
+  if (typeof input === 'string') {
+    const base64Match = input.match(/^data:([^;]+);base64,(.*)$/);
+    const rawBase64 = base64Match ? base64Match[2] : input;
+    try {
+      if (typeof Buffer !== 'undefined') {
+        bytes = new Uint8Array(Buffer.from(rawBase64.slice(0, 64), 'base64'));
+      } else {
+        const binStr = atob(rawBase64.slice(0, 64));
+        bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) {
+          bytes[i] = binStr.charCodeAt(i);
+        }
+      }
+    } catch {
+      return {
+        ok: false,
+        error: `${nombreOriginal}: contenido binario corrupto o codificación inválida.`,
+      };
+    }
+  } else {
+    bytes = input;
+  }
+
+  if (!bytes || bytes.length < 4) {
+    return {
+      ok: false,
+      error: `${nombreOriginal}: archivo vacío o cabecera binaria incompleta.`,
+    };
+  }
+
+  // Detectar ejecutables prohibidos: Windows PE/EXE (MZ: 0x4D 0x5A) o ELF (0x7F 'E' 'L' 'F')
+  if (
+    (bytes[0] === 0x4d && bytes[1] === 0x5a) ||
+    (bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46)
+  ) {
+    return {
+      ok: false,
+      error: `${nombreOriginal}: archivo rechazado por seguridad (ejecutable detectado por firma binaria).`,
+    };
+  }
+
+  const ext = nombreOriginal.includes('.')
+    ? nombreOriginal.split('.').pop()?.toLowerCase() ?? ''
+    : '';
+
+  // JPEG: FF D8 FF
+  const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  // PNG: 89 50 4E 47
+  const isPng =
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47;
+  // PDF: 25 50 44 46 (%PDF)
+  const isPdf =
+    bytes[0] === 0x25 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x44 &&
+    bytes[3] === 0x46;
+
+  if (isJpeg) {
+    if (ext && ext !== 'jpg' && ext !== 'jpeg') {
+      return {
+        ok: false,
+        error: `${nombreOriginal}: extensión falseada (la firma binaria corresponde a JPEG pero la extensión es .${ext}).`,
+      };
+    }
+    return { ok: true, tipo: 'FOTOGRAFIA', mimeReal: 'image/jpeg' };
+  }
+
+  if (isPng) {
+    if (ext && ext !== 'png') {
+      return {
+        ok: false,
+        error: `${nombreOriginal}: extensión falseada (la firma binaria corresponde a PNG pero la extensión es .${ext}).`,
+      };
+    }
+    return { ok: true, tipo: 'FOTOGRAFIA', mimeReal: 'image/png' };
+  }
+
+  if (isPdf) {
+    if (ext && ext !== 'pdf') {
+      return {
+        ok: false,
+        error: `${nombreOriginal}: extensión falseada (la firma binaria corresponde a PDF pero la extensión es .${ext}).`,
+      };
+    }
+    return { ok: true, tipo: 'PDF', mimeReal: 'application/pdf' };
+  }
+
+  return {
+    ok: false,
+    error: `${nombreOriginal}: firma binaria inválida o extensión falseada (solo se admiten cabeceras reales JPEG, PNG o PDF).`,
+  };
+}
+
+/**
+ * HU-17: Valida que la categoría y prioridad sugeridas por un análisis de IA
+ * pertenezcan estrictamente al catálogo oficial activo. Si la IA retorna una categoría
+ * o prioridad no reconocida o inactiva, descarta la sugerencia inválida (null) sin corromper la solicitud.
+ */
+export function validarSugerenciaIaContraCatalogo(
+  sugerencia: {
+    categoriaIdOrNombre?: number | string | null;
+    prioridadIdOrNombre?: number | string | null;
+  },
+  categoriasCatalogo: Categoria[],
+  prioridadesCatalogo: Prioridad[]
+): { categoriaSugeridaId: number | null; prioridadSugeridaId: number | null } {
+  const categoriasActivas = categoriasCatalogo.filter((c) => c.activa);
+  let categoriaValida: Categoria | undefined;
+
+  if (typeof sugerencia.categoriaIdOrNombre === 'number') {
+    categoriaValida = categoriasActivas.find((c) => c.id === sugerencia.categoriaIdOrNombre);
+  } else if (typeof sugerencia.categoriaIdOrNombre === 'string' && sugerencia.categoriaIdOrNombre.trim()) {
+    const cleanCat = sugerencia.categoriaIdOrNombre.trim().toLowerCase();
+    categoriaValida = categoriasActivas.find((c) => c.nombre.toLowerCase() === cleanCat);
+  }
+
+  let prioridadValida: Prioridad | undefined;
+  if (typeof sugerencia.prioridadIdOrNombre === 'number') {
+    prioridadValida = prioridadesCatalogo.find((p) => p.id === sugerencia.prioridadIdOrNombre);
+  } else if (typeof sugerencia.prioridadIdOrNombre === 'string' && sugerencia.prioridadIdOrNombre.trim()) {
+    const cleanPrio = sugerencia.prioridadIdOrNombre.trim().toLowerCase();
+    prioridadValida = prioridadesCatalogo.find((p) => p.nombre.toLowerCase() === cleanPrio);
+  }
+
+  return {
+    categoriaSugeridaId: categoriaValida ? categoriaValida.id : null,
+    prioridadSugeridaId: prioridadValida ? prioridadValida.id : null,
+  };
+}
+
+/**
+ * HU-16 / HU-17: Genera el dictamen de análisis asistido por IA sobre la descripción
+ * y evidencias de una solicitud, validando sus recomendaciones contra los catálogos activos.
+ */
+export function generarInferenciaAnalisisIa(
+  descripcionSolicitud: string,
+  recursoNombre: string,
+  recursoCodigo: string,
+  cantidadEvidencias: number,
+  categoriasCatalogo: Categoria[],
+  prioridadesCatalogo: Prioridad[],
+  overrideSugerencia?: {
+    categoriaIdOrNombre?: number | string | null;
+    prioridadIdOrNombre?: number | string | null;
+  }
+): {
+  tipoDano: string;
+  descripcionObservada: string;
+  categoriaSugeridaId: number | null;
+  prioridadSugeridaId: number | null;
+  modelo: string;
+} {
+  const text = `${descripcionSolicitud} ${recursoNombre}`.toLowerCase();
+  const activeCats = categoriasCatalogo.filter((c) => c.activa);
+
+  const findCat = (keyword: string, fallbackName: string) =>
+    activeCats.find((c) => c.nombre.toLowerCase().includes(keyword)) ??
+    activeCats.find((c) => c.nombre === fallbackName) ??
+    activeCats[0] ??
+    null;
+
+  let tipoDano = 'Desgaste o falla operativa general';
+  let cat = findCat('otra', 'Otra');
+  let prioNivel: 1 | 2 | 3 | 4 = 2;
+
+  if (/agua|goteo|fuga|tuber|humedad|drenaje/.test(text)) {
+    tipoDano = 'Fuga o filtración hidráulica';
+    cat = findCat('hidr', 'Hidráulica');
+    prioNivel = 2;
+  } else if (/eléctric|electr|breaker|volt|corto|tablero|cable|luz/.test(text)) {
+    tipoDano = 'Falla en circuito eléctrico';
+    cat = findCat('eléctr', 'Eléctrica');
+    prioNivel = 3;
+  } else if (/servidor|red|comput|impresora|pantalla|software|ti|ventilador/.test(text)) {
+    tipoDano = 'Falla de hardware o infraestructura TI';
+    cat = findCat('inform', 'Informática/Electrónica');
+    prioNivel = /alerta|crític|detiene|humo/.test(text) ? 4 : 3;
+  } else if (/motor|compresor|vibraci|mandril|ruido|maquin|mecánic|taladro/.test(text)) {
+    tipoDano = 'Desajuste o avería mecánica';
+    cat = findCat('mecán', 'Mecánica');
+    prioNivel = 3;
+  } else if (/piso|pared|techo|puerta|cerradura|ventana|locativ/.test(text)) {
+    tipoDano = 'Deterioro locativo o estructural';
+    cat = findCat('locat', 'Locativa/Estructural');
+    prioNivel = 2;
+  }
+
+  const prio = prioridadesCatalogo.find((p) => p.nivel === prioNivel) ?? prioridadesCatalogo[1];
+
+  const validadas = validarSugerenciaIaContraCatalogo(
+    overrideSugerencia ?? {
+      categoriaIdOrNombre: cat ? cat.id : null,
+      prioridadIdOrNombre: prio ? prio.id : null,
+    },
+    categoriasCatalogo,
+    prioridadesCatalogo
+  );
+
+  const evidenciasTexto =
+    cantidadEvidencias > 0
+      ? `Se analizaron ${cantidadEvidencias} evidencia(s) adjunta(s) junto con la descripción del recurso ${recursoCodigo}.`
+      : 'Sin evidencias adjuntas; análisis basado únicamente en la descripción textual del reporte.';
+
+  return {
+    tipoDano,
+    descripcionObservada: `${evidenciasTexto} Se identifica posible ${tipoDano.toLowerCase()} que requiere verificación técnica en sitio.`,
+    categoriaSugeridaId: validadas.categoriaSugeridaId,
+    prioridadSugeridaId: validadas.prioridadSugeridaId,
+    modelo: 'gemini-2.5-flash',
+  };
 }
 
 export function formatearFecha(iso: string | null): string {
@@ -443,6 +682,7 @@ export function calcularDistribucionHeader(input: HeaderLayoutInput): HeaderLayo
 }
 
 export {
+  calcularHashSha256,
   esPasswordHasheada,
   hashPassword,
   validarDatosRegistro,

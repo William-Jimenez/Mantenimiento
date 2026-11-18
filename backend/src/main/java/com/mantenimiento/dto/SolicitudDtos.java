@@ -16,6 +16,7 @@ public class SolicitudDtos {
             @Size(min = 20, max = 2000, message = "La descripción debe tener entre 20 y 2000 caracteres")
             String descripcion,
 
+            Long solicitanteId,
             Long categoriaId,
             Long prioridadId
     ) {}
@@ -48,6 +49,63 @@ public class SolicitudDtos {
             String trabajoRealizado
     ) {}
 
+    public record UploadEvidenciaRequest(
+            @NotBlank(message = "El nombre original del archivo es obligatorio")
+            String nombreOriginal,
+
+            @NotBlank(message = "El contenido binario en base64 / dataUrl es obligatorio")
+            String dataUrl,
+
+            @NotNull(message = "El tamaño en bytes es obligatorio")
+            Integer tamanoBytes
+    ) {}
+
+    public record EvidenciaDto(
+            Long id,
+            Long solicitudId,
+            String tipo,
+            String nombreOriginal,
+            String nombreAlmacenado,
+            String tipoMime,
+            Integer tamanoBytes,
+            String hashSha256,
+            Long subidaPorUsuarioId,
+            LocalDateTime subidaEn
+    ) {}
+
+    public record TriggerAnalisisIARequest(
+            Boolean simularFallo,
+            String errorDetalle,
+            String categoriaSugeridaNombre,
+            String prioridadSugeridaNombre
+    ) {}
+
+    public record RevisarAnalisisIARequest(
+            @NotBlank(message = "La decisión (ACEPTADO, MODIFICADO o DESCARTADO) es obligatoria")
+            String decision,
+            Long categoriaId,
+            Long prioridadId
+    ) {}
+
+    public record AnalisisIADto(
+            Long id,
+            Long solicitudId,
+            Integer version,
+            String estadoAnalisis,
+            String tipoDano,
+            String descripcionObservada,
+            Long categoriaSugeridaId,
+            String categoriaSugeridaNombre,
+            Long prioridadSugeridaId,
+            String prioridadSugeridaNombre,
+            String modelo,
+            String decisionRevision,
+            String errorDetalle,
+            LocalDateTime creadoEn,
+            LocalDateTime completadoEn,
+            LocalDateTime revisadoEn
+    ) {}
+
     public record AsignacionDto(
             Long id,
             Long tecnicoId,
@@ -75,6 +133,8 @@ public class SolicitudDtos {
             Long solicitanteId,
             String solicitanteNombre,
             String solicitanteCorreo,
+            Long registradaPorUsuarioId,
+            String registradaPorNombre,
             Long recursoId,
             String recursoCodigo,
             String recursoNombre,

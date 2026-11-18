@@ -1,11 +1,13 @@
 package com.mantenimiento.controller;
 
+import com.mantenimiento.domain.entity.Asignacion;
 import com.mantenimiento.domain.entity.Empleado;
 import com.mantenimiento.domain.entity.Usuario;
 import com.mantenimiento.domain.enums.PerfilUsuario;
 import com.mantenimiento.dto.AuthDtos.UserProfileDto;
 import com.mantenimiento.dto.UsuarioDtos.*;
 import com.mantenimiento.exception.ApiException;
+import com.mantenimiento.repository.AsignacionRepository;
 import com.mantenimiento.repository.EmpleadoRepository;
 import com.mantenimiento.repository.UsuarioRepository;
 import com.mantenimiento.service.AuthService;
@@ -17,6 +19,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/usuarios")
@@ -25,15 +29,18 @@ public class UsuarioController {
 
     private final UsuarioRepository usuarioRepository;
     private final EmpleadoRepository empleadoRepository;
+    private final AsignacionRepository asignacionRepository;
     private final PasswordEncoder passwordEncoder;
 
     public UsuarioController(
             UsuarioRepository usuarioRepository,
             EmpleadoRepository empleadoRepository,
+            AsignacionRepository asignacionRepository,
             PasswordEncoder passwordEncoder
     ) {
         this.usuarioRepository = usuarioRepository;
         this.empleadoRepository = empleadoRepository;
+        this.asignacionRepository = asignacionRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -74,11 +81,12 @@ public class UsuarioController {
         );
         empleado = empleadoRepository.save(empleado);
 
+        // HU-02: Usuario creado por el Administrador nace con debeCambiarPassword = true
         Usuario usuario = new Usuario(
                 empleado,
                 perfil,
                 passwordEncoder.encode(request.password()),
-                false
+                true
         );
         usuario = usuarioRepository.save(usuario);
 
@@ -100,11 +108,72 @@ public class UsuarioController {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Perfil inválido. Use ADMINISTRADOR, EMPLEADO o CLIENTE");
         }
 
-        usuario.setPerfil(nuevoPerfil);
-        if (request.esTecnico() != null) {
-            usuario.getEmpleado().setEsTecnico(request.esTecnico());
-            empleadoRepository.save(usuario.getEmpleado());
+        // HU-02: Bloquear revocación de privilegios al último Administrador activo
+        if (usuario.getPerfil() == PerfilUsuario.ADMINISTRADOR
+                && nuevoPerfil != PerfilUsuario.ADMINISTRADOR
+                && usuario.isActivo()) {
+            long adminsActivos = usuarioRepository.findAll().stream()
+                    .filter(u -> u.isActivo() && u.getPerfil() == PerfilUsuario.ADMINISTRADOR)
+                    .count();
+            if (adminsActivos <= 1) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "No se puede degradar al único Administrador activo del sistema"
+                );
+            }
         }
+
+        Empleado emp = usuario.getEmpleado();
+        boolean nuevoEsTecnico = request.esTecnico() != null
+                ? request.esTecnico()
+                : (nuevoPerfil == PerfilUsuario.EMPLEADO || (emp.isEsTecnico() && nuevoPerfil == PerfilUsuario.ADMINISTRADOR));
+
+        // HU-03: Verificar que no tenga solicitudes en Asignada o En proceso antes de quitar esTecnico
+        if (emp.isEsTecnico() && !nuevoEsTecnico) {
+            List<Asignacion> activas = asignacionRepository.findByTecnicoIdAndVigenteTrue(emp.getId()).stream()
+                    .filter(a -> Set.of("Asignada", "En proceso").contains(a.getSolicitud().getEstado().getNombre()))
+                    .toList();
+            if (!activas.isEmpty()) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "El técnico tiene solicitudes en estado Asignada o En proceso. Reasígnelas antes de retirar su función técnica"
+                );
+            }
+        }
+
+        usuario.setPerfil(nuevoPerfil);
+        emp.setEsTecnico(nuevoEsTecnico);
+        empleadoRepository.save(emp);
+        usuario = usuarioRepository.save(usuario);
+        return ResponseEntity.ok(AuthService.toUserProfileDto(usuario));
+    }
+
+    @PatchMapping("/{id}/estado")
+    public ResponseEntity<UserProfileDto> cambiarEstadoActivo(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Boolean> body
+    ) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        boolean nuevoActivo = (body != null && body.containsKey("activo"))
+                ? Boolean.TRUE.equals(body.get("activo"))
+                : !usuario.isActivo();
+
+        // HU-02: Bloquear desactivación del último Administrador activo
+        if (usuario.isActivo() && !nuevoActivo && usuario.getPerfil() == PerfilUsuario.ADMINISTRADOR) {
+            long adminsActivos = usuarioRepository.findAll().stream()
+                    .filter(u -> u.isActivo() && u.getPerfil() == PerfilUsuario.ADMINISTRADOR)
+                    .count();
+            if (adminsActivos <= 1) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "No se puede desactivar al único Administrador activo del sistema"
+                );
+            }
+        }
+
+        usuario.setActivo(nuevoActivo);
         usuario = usuarioRepository.save(usuario);
         return ResponseEntity.ok(AuthService.toUserProfileDto(usuario));
     }

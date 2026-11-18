@@ -156,8 +156,8 @@ public class AuthService {
     }
 
     public static void validarPoliticaPassword(String password) {
-        if (password == null || password.length() < 8) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "La contraseña debe tener al menos 8 caracteres");
+        if (password == null || password.length() < 10) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "La contraseña debe tener al menos 10 caracteres");
         }
         boolean tieneLetra = password.chars().anyMatch(Character::isLetter);
         boolean tieneNumero = password.chars().anyMatch(Character::isDigit);

@@ -295,7 +295,7 @@ El sistema hace cumplir de forma estricta —tanto en la interfaz web como en lo
 | Asignar o reasignar técnico responsable (`POST /api/admin/solicitudes/:id/asignar`) | **Sí** | No (`403`) | No (`403`) |
 | Registrar el trabajo técnico realizado (`PATCH /api/tecnico/solicitudes/:id/trabajo`) | **Sí** | **Sí** (solo en asignadas) | No (`403`) |
 | Actualizar estado a `En proceso` o `Finalizada` (`PATCH /api/tecnico/solicitudes/:id/estado`) | **Sí** | **Sí** (solo en asignadas) | No (`403`) |
-| Cancelar o rechazar solicitud (con motivo obligatorio) | **Sí** | No (`403`) | No (`403`) |
+| Cancelar o rechazar solicitud (con motivo obligatorio ≥ 10 caracteres) | **Sí** (en abiertas) | No (`403`) | **Sí** (solo cancelar propias en `Pendiente`) |
 | Revisar análisis de IA (Aceptar / Modificar / Descartar) | **Sí** | No | No |
 | Consultar resultados de IA y trabajo realizado | **Sí** | **Sí** (solo de las asignadas) | **Sí** (solo de sus propias solicitudes) |
 

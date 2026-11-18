@@ -60,6 +60,7 @@ export function NewRequestScreen() {
   const [erroresCampo, setErroresCampo] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const empleadosActivos = useMemo(
     () => empleados.filter((e) => e.activo),
@@ -115,7 +116,16 @@ export function NewRequestScreen() {
     const validToAdd: PendingFile[] = [];
 
     for (const file of Array.from(fileList)) {
-      const check = validarArchivoEvidencia(file, fotosCount, pdfsCount);
+      let headerBytes: Uint8Array | undefined;
+      try {
+        if (typeof file.slice === 'function') {
+          const buf = await file.slice(0, 16).arrayBuffer();
+          headerBytes = new Uint8Array(buf);
+        }
+      } catch {
+        // Fallback if arrayBuffer slice is unavailable
+      }
+      const check = validarArchivoEvidencia(file, fotosCount, pdfsCount, headerBytes);
       if (!check.ok) {
         setArchivoError(check.error);
         continue;
@@ -418,14 +428,36 @@ export function NewRequestScreen() {
 
             <label
               htmlFor="evidencias-input"
-              className="flex flex-col items-center justify-center gap-[10px] border border-dashed border-white/25 hover:border-electric-iris rounded-[24px] p-[24px] cursor-pointer transition-colors text-center"
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging(false);
+                if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+                  void handleFilesSelected(e.dataTransfer.files);
+                }
+              }}
+              className={`flex flex-col items-center justify-center gap-[10px] border border-dashed rounded-[24px] p-[24px] cursor-pointer transition-colors text-center ${
+                isDragging
+                  ? 'border-electric-iris bg-electric-iris/10'
+                  : 'border-white/25 hover:border-electric-iris'
+              }`}
             >
               <Upload className="w-6 h-6 text-electric-iris" aria-hidden="true" />
               <span className="text-[15px] text-bone-white">
-                Seleccionar fotografías o documentos PDF
+                Arrastre y suelte o seleccione fotografías y documentos PDF
               </span>
               <span className="text-[13px] text-ash-gray">
-                Puede adjuntar archivos ahora o posteriormente mientras la solicitud esté Pendiente.
+                Validación automática de firma binaria (JPEG, PNG, PDF) y hash SHA-256 de integridad.
               </span>
               <input
                 id="evidencias-input"
