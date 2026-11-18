@@ -11,3 +11,10 @@
 
 2. **Otras ramas:**
    - En ramas distintas a `qa` (por ejemplo `main` o `dev`), se mantiene la ejecución estándar (`npm test`).
+
+## Reglas de Mantenimiento Autónomo de Documentación
+
+3. **Actualización Automática y Acotada de Documentación:**
+   - En todas las peticiones, si los cambios realizados hacen estrictamente necesario actualizar la documentación del proyecto (`README`, `COMO_VER_EL_PROYECTO.md`, `docs/SRS.md`, `docs/diagrama_uml.md`, `docs/modelo_entidad_relacion.md`, `.env.example` o comentarios de API), debe hacerse como parte de la misma tarea sin pedir confirmación previa.
+   - Actualizar únicamente las secciones que queden desfasadas, incorrectas o incompletas a causa de la petición, manteniendo el estilo, idioma, formato y terminología existentes, sin reescribir secciones válidas no relacionadas.
+   - Al finalizar, indicar brevemente qué archivos de documentación se modificaron y por qué cada cambio era necesario.

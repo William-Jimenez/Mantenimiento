@@ -116,9 +116,10 @@ Diseñar, implementar e integrar una plataforma web robusta para la gestión cor
 ### 1.5 Alcances del Sistema
 
 #### 1.5.1 Alcance Incluido (Línea Base Confirmada)
-- Aplicación web con diseño responsivo operable en dispositivos móviles y de escritorio.
+- Aplicación web con diseño responsivo operable en dispositivos móviles y de escritorio, con selector persistente de tema visual (modo oscuro / modo claro) y conmutador de idioma Español (`ES`) / Inglés (`EN`).
 - Gestión de usuarios bajo una jerarquía de tres perfiles con control de acceso por rol (RBAC) en frontend y backend: **Administrador** (`ADMINISTRADOR`), **Empleado / Técnico** (`EMPLEADO`) y **Cliente** (`CLIENTE`).
 - Flujo de autorregistro público de usuarios (`/registro`, `POST /api/auth/register`) que permite crear cuentas con rol `CLIENTE`, validando campos obligatorios, formato de correo y política de contraseña tanto en cliente como en servidor, previniendo duplicados por correo o documento (`HTTP 409 Conflict`), almacenando la contraseña mediante hash criptográfico con sal aleatoria (`PBKDF2-HMAC-SHA256`, nunca en texto plano) e iniciando sesión automáticamente tras el registro exitoso.
+- Flujo de restablecimiento y cambio de contraseña con verificación de dos pasos por correo electrónico (`/recuperar-contrasena`, `POST /api/auth/recovery/send-code`, `POST /api/auth/recovery/verify-code` y `POST /api/auth/reset-password`) mediante código OTP de 6 dígitos con expiración de 10 minutos, temporizador de reenvío de 60 segundos y medidor de fortaleza de contraseña en tiempo real.
 - Registro del trabajo técnico realizado (`trabajoRealizado`) sobre las solicitudes asignadas por parte del Empleado técnico o Administrador.
 - Módulo de recursos con códigos únicos de activo, tipo de recurso, nombre, descripción y ubicación.
 - Cuatro tipos canónicos de recursos: *Equipo tecnológico*, *Instalación o edificio*, *Maquinaria* y *Herramienta*.
@@ -561,15 +562,18 @@ A continuación se detallan las 20 Historias de Usuario canónicas del sistema, 
   - *Cuando* presiona "Descartar".
   - *Entonces* el expediente queda sin categoría/prioridad automática hasta que se asignen explícitamente, marcándose la decisión como `DESCARTADO`.
 
-#### HU-19: Gestión del Panel Personal y Cambio de Contraseña
+#### HU-19: Gestión del Panel Personal, Recuperación en Dos Pasos y Cambio de Contraseña
 - **Como:** Usuario registrado.
-- **Quiero:** Actualizar mi contraseña de acceso y cambiarla obligatoriamente si poseo una credencial temporal.
-- **Para:** Proteger la seguridad de mi cuenta y evitar accesos no autorizados a mis reportes.
+- **Quiero:** Restablecer mi contraseña mediante verificación de dos pasos por correo electrónico (`/recuperar-contrasena`) o cambiarla obligatoriamente si poseo una credencial temporal.
+- **Para:** Recuperar el acceso a mi cuenta de forma segura y proteger mis reportes frente a accesos no autorizados.
 - **Criterios de Aceptación:**
+  - *Dado* un usuario que olvidó su contraseña y accede desde el enlace del módulo `"¿Olvidó su contraseña?"` a `/recuperar-contrasena`.
+  - *Cuando* ingresa su correo electrónico registrado, valida el código OTP de 6 dígitos (vigencia de 10 minutos) y define su nueva contraseña.
+  - *Entonces* el sistema actualiza el hash criptográfico `PBKDF2-HMAC-SHA256`, limpia bloqueos previos y confirma `"Tu contraseña ha sido restablecida con éxito."`.
   - *Dado* un usuario con indicador `debeCambiarPassword = true`.
   - *Cuando* inicia sesión en la plataforma.
   - *Entonces* el sistema lo redirecciona de manera mandatoria a la pantalla de cambio de clave, bloqueando cualquier navegación a otros módulos hasta que cumpla la regla de complejidad.
-  - *Cuando* ingresa una nueva contraseña que coincide con los criterios de seguridad (mínimo 8 caracteres, números y letras).
+  - *Cuando* ingresa una nueva contraseña que coincide con los criterios de seguridad (mínimo 10 caracteres, números y letras).
   - *Entonces* el hash de la clave se actualiza en base de datos y se remueve la bandera de cambio forzoso.
 
 #### HU-20: Trazabilidad y Consulta del Historial de Estados
@@ -837,14 +841,14 @@ A continuación se presentan las fichas técnicas normalizadas de los 20 Requeri
 | **Manejo de Situaciones Anormales:** | - Intento de revisión por usuario no Administrador: Acceso denegado.<br>- Modificación con campos en blanco: El sistema exige completar los selectores antes de aplicar. |
 | **Criterios de Aceptación:** | - Queda trazabilidad de quién tomó la decisión, en qué fecha y qué valores propuso la máquina frente a los aprobados por el humano. |
 
-| Identificador: **RF-19** | Nombre: **Autenticación Segura y Cambio Forzoso de Clave Temporal** |
+| Identificador: **RF-19** | Nombre: **Autenticación Segura, Recuperación en Dos Pasos y Cambio Forzoso de Clave Temporal** |
 | :--- | :--- |
 | **Tipo:** Necesario | **¿Crítico?:** Sí \| **Prioridad:** Alta |
 | **Requerimientos Relacionados:** | RF-02 (Usuarios) |
-| **Documentos Asociados:** | Pantalla de Inicio de Sesión, Pantalla de Cambio Obligatorio de Contraseña |
-| **Entradas:** | Correo corporativo y contraseña actual; nueva contraseña y confirmación. |
-| **Salidas:** | Sesión iniciada con cookie segura; o actualización de contraseña con desactivación de bandera `debeCambiarPassword`. |
-| **Descripción:** | Gestiona el inicio de sesión contra credenciales cifradas con BCrypt. Si el usuario cuenta con clave temporal generada por el Administrador, es interceptado y obligado a fijar una clave definitiva antes de interactuar con la plataforma. |
+| **Documentos Asociados:** | Pantalla de Inicio de Sesión, Pantalla de Cambio y Recuperación de Contraseña (`/recuperar-contrasena`, `/cuenta/contrasena`) |
+| **Entradas:** | Correo corporativo y contraseña actual; o correo corporativo, código OTP de 6 dígitos, nueva contraseña y confirmación. |
+| **Salidas:** | Sesión iniciada con cookie/token seguro; o actualización de contraseña cifrada con `PBKDF2-HMAC-SHA256` y desactivación de bandera `debeCambiarPassword`. |
+| **Descripción:** | Gestiona el inicio de sesión contra credenciales cifradas con `PBKDF2-HMAC-SHA256`, la recuperación de cuenta mediante verificación en 2 pasos por correo electrónico (código OTP de 6 dígitos con expiración de 10 minutos y enfriamiento de reenvío de 60 segundos), y el cambio obligatorio de clave temporal en el primer acceso. |
 | **Manejo de Situaciones Anormales:** | - Cinco intentos fallidos consecutivos: Bloqueo de la cuenta por 15 minutos asentando marca `bloqueadoHasta`.<br>- Contraseñas no coincidentes en cambio: Aviso visual de discordancia.<br>- Credenciales inválidas: Mensaje genérico de seguridad ("Usuario o contraseña incorrectos") para mitigar ataques de enumeración. |
 | **Criterios de Aceptación:** | - Ningún usuario con contraseña temporal puede saltar el muro de cambio forzado mediante navegación por URL directa. |
 
