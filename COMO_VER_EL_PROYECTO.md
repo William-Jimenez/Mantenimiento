@@ -92,11 +92,20 @@ npm.cmd run dev
 
 El servidor se iniciará y escuchará en todas las interfaces de red (`0.0.0.0`) en el puerto **3000**.
 
-### Verificación de Compilación y Tipado (Opcional)
+### Verificación de Compilación, Tipado y Pruebas
 * Comprobar tipos TypeScript:
   ```powershell
   npm.cmd run lint
   ```
+* Ejecución de pruebas unitarias y de integración (RBAC):
+  ```powershell
+  npm.cmd test
+  ```
+* Ejecución de pruebas con el servicio local Jules (recomendado y estándar en rama `qa`):
+  ```powershell
+  npm.cmd run test:jules
+  ```
+  *(o `npm.cmd run test:qa`)*
 * Construir para producción:
   ```powershell
   npm.cmd run build
