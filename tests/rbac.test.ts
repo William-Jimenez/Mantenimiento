@@ -515,4 +515,36 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
     assert.equal(resCorreoInvalido.body.codigo, 'VALIDACION');
     assert.equal(resCorreoInvalido.body.campo, 'correo');
   });
+
+  // ==========================================================================
+  // 5. Pruebas de Recuperación y Cambio de Contraseña (/recuperar-contrasena)
+  // ==========================================================================
+  it('permite acceder a la ruta dedicada de cambio de contraseña y restablecer la clave de una cuenta existente', async () => {
+    // Un usuario anónimo puede navegar a /recuperar-contrasena y /cuenta/contrasena desde el enlace del módulo "¿Olvidó su contraseña?"
+    assert.equal(tienePermisoRuta(null, '/recuperar-contrasena'), true);
+    assert.equal(tienePermisoRuta(null, '/cuenta/contrasena'), true);
+
+    // Restablecimiento exitoso con correo registrado y nueva contraseña válida
+    const resReset = await apiRequest('/api/auth/reset-password', {
+      method: 'POST',
+      body: {
+        correo: 'mateo.rojas@empresa.com',
+        nuevaPassword: 'NuevaClaveSegura2026',
+        confirmacion: 'NuevaClaveSegura2026',
+      },
+    });
+    assert.equal(resReset.status, 200);
+    assert.equal(resReset.body.ok, true);
+
+    // Verifica que la contraseña se actualizó con hash criptográfico y permite iniciar sesión
+    const resLogin = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: {
+        correo: 'mateo.rojas@empresa.com',
+        password: 'NuevaClaveSegura2026',
+      },
+    });
+    assert.equal(resLogin.status, 200);
+    assert.equal(resLogin.body.ok, true);
+  });
 });

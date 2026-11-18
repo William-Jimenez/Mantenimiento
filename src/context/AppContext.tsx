@@ -158,6 +158,11 @@ interface AppContextValue {
   };
   logout: (motivo?: string) => void;
   cambiarPasswordInicial: (nuevaPassword: string, confirmacion: string) => ActionResult;
+  restablecerPasswordPorCorreo: (
+    correo: string,
+    nuevaPassword: string,
+    confirmacion: string
+  ) => ActionResult;
 
   // M1 Empleados & Usuarios (RS-01, RS-04)
   guardarEmpleado: (
@@ -360,7 +365,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Route guard enforcing User Flow 4.3 & RC-01 (P-01, P-02, P-03)
   useEffect(() => {
     if (!currentUser || !currentEmpleado) {
-      if (pathname !== '/login' && pathname !== '/registro') {
+      if (
+        pathname !== '/login' &&
+        pathname !== '/registro' &&
+        pathname !== '/recuperar-contrasena' &&
+        pathname !== '/cuenta/contrasena'
+      ) {
         setIntendedPath(pathname + window.location.search);
         navigate('/login', { replace: true });
       }
@@ -368,13 +378,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (currentUser.debeCambiarPassword) {
-      if (pathname !== '/cuenta/contrasena') {
+      if (pathname !== '/cuenta/contrasena' && pathname !== '/recuperar-contrasena') {
         navigate('/cuenta/contrasena', { replace: true });
       }
       return;
     }
 
-    if (pathname === '/login' || pathname === '/registro' || pathname === '/cuenta/contrasena') {
+    if (pathname === '/login' || pathname === '/registro') {
       navigate('/', { replace: true });
     }
   }, [currentUser, currentEmpleado, pathname, navigate]);
@@ -761,31 +771,113 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           error: 'Las contraseñas no coinciden.',
         };
       }
-      if (nuevaPassword === currentUser.password) {
+      if (verifyPassword(nuevaPassword, currentUser.password)) {
         return {
           ok: false,
           codigo: 'VALIDACION',
           campo: 'nuevaPassword',
-          error: 'Debe elegir una contraseña distinta a la temporal.',
+          error: 'Debe elegir una contraseña distinta a la actual.',
         };
       }
 
+      const passwordHasheada = hashPassword(nuevaPassword);
       setState((prev) => ({
         ...prev,
         usuarios: prev.usuarios.map((u) =>
           u.id === currentUser.id
-            ? { ...u, password: nuevaPassword, debeCambiarPassword: false }
+            ? { ...u, password: passwordHasheada, debeCambiarPassword: false }
             : u
         ),
       }));
 
       pushToast('exito', 'Contraseña actualizada correctamente.');
-      const target = intendedPath && intendedPath !== '/login' ? intendedPath : '/';
+      const target =
+        intendedPath &&
+        intendedPath !== '/login' &&
+        intendedPath !== '/recuperar-contrasena' &&
+        intendedPath !== '/cuenta/contrasena'
+          ? intendedPath
+          : '/';
       setIntendedPath(null);
       navigate(target, { replace: true });
       return { ok: true };
     },
     [currentUser, intendedPath, navigate, pushToast]
+  );
+
+  const restablecerPasswordPorCorreo = useCallback(
+    (correo: string, nuevaPassword: string, confirmacion: string): ActionResult => {
+      const cleanCorreo = correo.trim().toLowerCase();
+      if (!cleanCorreo) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'correo',
+          error: 'Ingrese el correo electrónico asociado a su cuenta.',
+        };
+      }
+
+      const normalized =
+        cleanCorreo === 'empleado@empresa.com' ? 'cliente@empresa.com' : cleanCorreo;
+      const empleado = state.empleados.find(
+        (e) => e.correo.toLowerCase() === normalized && e.activo
+      );
+      const usuario = empleado
+        ? state.usuarios.find((u) => u.empleadoId === empleado.id && u.activo)
+        : undefined;
+
+      if (!empleado || !usuario) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'correo',
+          error: 'No se encontró una cuenta activa asociada a este correo electrónico.',
+        };
+      }
+
+      const policyError = validarPoliticaPassword(nuevaPassword);
+      if (policyError) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'nuevaPassword',
+          error: policyError,
+        };
+      }
+
+      if (nuevaPassword !== confirmacion) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'confirmacion',
+          error: 'Las contraseñas no coinciden.',
+        };
+      }
+
+      const passwordHasheada = hashPassword(nuevaPassword);
+      setState((prev) => ({
+        ...prev,
+        usuarios: prev.usuarios.map((u) =>
+          u.id === usuario.id
+            ? {
+                ...u,
+                password: passwordHasheada,
+                debeCambiarPassword: false,
+                intentosFallidos: 0,
+                bloqueadoHasta: null,
+              }
+            : u
+        ),
+      }));
+
+      setLoginNotice(
+        'Contraseña restablecida correctamente. Ya puede iniciar sesión con su nueva clave.'
+      );
+      pushToast('exito', 'Contraseña actualizada con éxito.');
+      navigate('/login', { replace: true });
+      return { ok: true };
+    },
+    [state.empleados, state.usuarios, navigate, pushToast]
   );
 
   const guardarEmpleado: AppContextValue['guardarEmpleado'] = useCallback(
@@ -2083,6 +2175,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     registrarCuenta,
     logout,
     cambiarPasswordInicial,
+    restablecerPasswordPorCorreo,
     guardarEmpleado,
     toggleTecnicoEmpleado,
     crearUsuario,

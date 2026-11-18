@@ -23,13 +23,20 @@ import { tienePermisoRuta } from './services/domainRules';
 function RouterView() {
   const { pathname, currentUser } = useApp();
 
-  // P-01: Anonymous login screen
+  // P-01 & P-02: Anonymous login or dedicated password recovery/change screen
   if (!currentUser) {
+    if (pathname === '/recuperar-contrasena' || pathname === '/cuenta/contrasena') {
+      return <ChangePasswordScreen />;
+    }
     return <LoginScreen />;
   }
 
-  // P-02: Mandatory temporary password change
-  if (currentUser.debeCambiarPassword) {
+  // P-02: Mandatory temporary password change or explicit password change screen
+  if (
+    currentUser.debeCambiarPassword ||
+    pathname === '/recuperar-contrasena' ||
+    pathname === '/cuenta/contrasena'
+  ) {
     return <ChangePasswordScreen />;
   }
 

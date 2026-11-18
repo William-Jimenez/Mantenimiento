@@ -39,15 +39,24 @@ export function esEstadoFinal(estado: EstadoNombre): boolean {
  *   Sin acceso a rutas de empleado (/tecnico/*) ni de administrador (/admin/*).
  */
 export function tienePermisoRuta(usuario: Usuario | null, pathname: string): boolean {
+  const cleanPath = pathname.split('?')[0] || '/';
+
   if (!usuario || !usuario.activo) {
-    return pathname === '/login' || pathname === '/registro';
+    return (
+      cleanPath === '/login' ||
+      cleanPath === '/registro' ||
+      cleanPath === '/recuperar-contrasena' ||
+      cleanPath === '/cuenta/contrasena'
+    );
   }
 
   if (usuario.debeCambiarPassword) {
-    return pathname === '/cuenta/contrasena';
+    return cleanPath === '/cuenta/contrasena' || cleanPath === '/recuperar-contrasena';
   }
 
-  const cleanPath = pathname.split('?')[0] || '/';
+  if (cleanPath === '/recuperar-contrasena' || cleanPath === '/cuenta/contrasena') {
+    return true;
+  }
 
   if (cleanPath === '/error') {
     return true;

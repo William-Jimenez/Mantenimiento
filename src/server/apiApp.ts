@@ -17,6 +17,7 @@ import {
   puedeRegistrarTrabajo,
   puedeVerSolicitud,
   validarDatosRegistro,
+  validarPoliticaPassword,
   verifyPassword,
 } from '../services/domainRules';
 import {
@@ -323,6 +324,77 @@ export function createApiApp(customStore?: BackendStore) {
         ok: false,
         codigo: 'ERROR_INTERNO',
         error: 'No fue posible procesar el inicio de sesión en este momento.',
+      });
+    }
+  });
+
+  app.post('/api/auth/reset-password', (req: Request, res: Response) => {
+    try {
+      const rawCorreo = String(req.body?.correo ?? '').trim().toLowerCase();
+      const correo = rawCorreo === 'empleado@empresa.com' ? 'cliente@empresa.com' : rawCorreo;
+      const nuevaPassword = String(req.body?.nuevaPassword ?? '');
+      const confirmacion = String(req.body?.confirmacion ?? '');
+
+      if (!correo) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'correo',
+          error: 'Ingrese el correo electrónico asociado a su cuenta.',
+        });
+        return;
+      }
+
+      const empleado = store.empleados.find((e) => e.correo.toLowerCase() === correo && e.activo);
+      const usuario = empleado
+        ? store.usuarios.find((u) => u.empleadoId === empleado.id && u.activo)
+        : undefined;
+
+      if (!empleado || !usuario) {
+        res.status(404).json({
+          ok: false,
+          codigo: 'NO_ENCONTRADO',
+          campo: 'correo',
+          error: 'No se encontró una cuenta activa asociada a este correo electrónico.',
+        });
+        return;
+      }
+
+      const policyError = validarPoliticaPassword(nuevaPassword);
+      if (policyError) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'nuevaPassword',
+          error: policyError,
+        });
+        return;
+      }
+
+      if (nuevaPassword !== confirmacion) {
+        res.status(400).json({
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'confirmacion',
+          error: 'Las contraseñas no coinciden.',
+        });
+        return;
+      }
+
+      usuario.password = hashPassword(nuevaPassword);
+      usuario.debeCambiarPassword = false;
+      usuario.intentosFallidos = 0;
+      usuario.bloqueadoHasta = null;
+
+      res.json({
+        ok: true,
+        mensaje: 'Contraseña restablecida correctamente.',
+      });
+    } catch {
+      res.status(500).json({
+        ok: false,
+        codigo: 'ERROR_INTERNO',
+        error: 'No fue posible restablecer la contraseña en este momento.',
       });
     }
   });

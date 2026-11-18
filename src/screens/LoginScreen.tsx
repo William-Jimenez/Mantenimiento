@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowDown, CheckCircle2, Eye, EyeOff, KeyRound, UserPlus } from 'lucide-react';
+import { ArrowDown, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, UserPlus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ConstellationCanvas, LogoLockup } from '../components/ConstellationCanvas';
 import { FieldError, FieldLabel, inputBaseClass, OutlineButton, PrimaryButton } from '../components/CommonUI';
@@ -353,18 +353,39 @@ export function LoginScreen() {
                     </div>
                   </form>
 
-                  {/* SU-08: mandatory administrator contact message — elevated and styled */}
-                  <div className="max-w-[440px] rounded-[14px] border border-white/12 bg-white/[0.03] backdrop-blur-sm px-[16px] py-[12px] flex items-center gap-[12px] transition-colors hover:border-white/22">
+                  {/* SU-08: módulo "¿Olvidó su contraseña?" con enlace interactivo superior de cambio/recuperación */}
+                  <div
+                    data-testid="modulo-olvido-contrasena"
+                    className="max-w-[440px] rounded-[14px] border border-white/12 bg-white/[0.03] backdrop-blur-sm px-[16px] py-[12px] flex items-start gap-[12px] transition-colors hover:border-white/22"
+                  >
                     <span
                       aria-hidden="true"
-                      className="w-[32px] h-[32px] rounded-[10px] bg-saffron-spark/12 border border-saffron-spark/30 flex items-center justify-center shrink-0 text-saffron-spark"
+                      className="w-[32px] h-[32px] rounded-[10px] bg-saffron-spark/12 border border-saffron-spark/30 flex items-center justify-center shrink-0 text-saffron-spark mt-[2px]"
                     >
                       <KeyRound className="w-[15px] h-[15px]" />
                     </span>
-                    <p className="text-[13px] sm:text-[14px] leading-[1.45] text-silver-mist">
-                      <span className="font-medium text-bone-white">¿Olvidó su contraseña?</span>{' '}
-                      Comuníquese con el <span className="text-saffron-spark font-medium">Administrador</span>.
-                    </p>
+                    <div className="flex flex-col gap-[6px]">
+                      <a
+                        href="/recuperar-contrasena"
+                        data-testid="link-cambiar-contrasena"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          clearLoginNotice();
+                          const targetUrl = correo.trim()
+                            ? `/recuperar-contrasena?correo=${encodeURIComponent(correo.trim())}`
+                            : '/recuperar-contrasena';
+                          navigate(targetUrl);
+                        }}
+                        className="inline-flex items-center gap-[6px] text-[13px] sm:text-[14px] font-semibold text-saffron-spark hover:text-bone-white underline underline-offset-4 transition-colors cursor-pointer w-fit"
+                      >
+                        <span>Ir a cambio y recuperación de contraseña</span>
+                        <ArrowRight className="w-[14px] h-[14px]" aria-hidden="true" />
+                      </a>
+                      <p className="text-[13px] sm:text-[14px] leading-[1.45] text-silver-mist">
+                        <span className="font-medium text-bone-white">¿Olvidó su contraseña?</span>{' '}
+                        Comuníquese con el <span className="text-saffron-spark font-medium">Administrador</span>.
+                      </p>
+                    </div>
                   </div>
                 </>
               ) : (
