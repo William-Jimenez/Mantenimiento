@@ -108,6 +108,10 @@ export function createApiApp(customStore?: BackendStore) {
   const store = customStore ?? createInitialBackendStore();
   const app = express();
   app.use(express.json());
+  const recoveryCodes = new Map<
+    string,
+    { codigo: string; expiraEn: number; intentosFallidos: number; verificado: boolean }
+  >();
 
   const requireAuth = (req: Request, res: Response, next: NextFunction) => {
     let usuarioId: number | null = null;
@@ -326,6 +330,101 @@ export function createApiApp(customStore?: BackendStore) {
         error: 'No fue posible procesar el inicio de sesión en este momento.',
       });
     }
+  });
+
+  app.post('/api/auth/recovery/send-code', (req: Request, res: Response) => {
+    const rawCorreo = String(req.body?.correo ?? '').trim().toLowerCase();
+    const correo = rawCorreo === 'empleado@empresa.com' ? 'cliente@empresa.com' : rawCorreo;
+
+    if (!correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+      res.status(400).json({
+        ok: false,
+        codigo: 'VALIDACION',
+        campo: 'correo',
+        error: 'Ingrese un correo electrónico válido.',
+      });
+      return;
+    }
+
+    const empleado = store.empleados.find((e) => e.correo.toLowerCase() === correo && e.activo);
+    const usuario = empleado
+      ? store.usuarios.find((u) => u.empleadoId === empleado.id && u.activo)
+      : undefined;
+
+    if (!empleado || !usuario) {
+      res.status(404).json({
+        ok: false,
+        codigo: 'NO_ENCONTRADO',
+        campo: 'correo',
+        error:
+          'Este correo electrónico no se encuentra registrado en el sistema. Puede crear una cuenta nueva o comunicarse con soporte técnico / el Administrador.',
+      });
+      return;
+    }
+
+    const codigo = String(Math.floor(100000 + Math.random() * 900000));
+    const expiraEn = Date.now() + 10 * 60 * 1000;
+    recoveryCodes.set(correo, {
+      codigo,
+      expiraEn,
+      intentosFallidos: 0,
+      verificado: false,
+    });
+
+    res.json({
+      ok: true,
+      mensaje: 'Código de verificación enviado al correo electrónico.',
+      codigoSimulado: codigo,
+      expiraEn,
+    });
+  });
+
+  app.post('/api/auth/recovery/verify-code', (req: Request, res: Response) => {
+    const rawCorreo = String(req.body?.correo ?? '').trim().toLowerCase();
+    const correo = rawCorreo === 'empleado@empresa.com' ? 'cliente@empresa.com' : rawCorreo;
+    const codigoInput = String(req.body?.codigo ?? '').trim();
+
+    if (!/^\d{6}$/.test(codigoInput)) {
+      res.status(400).json({
+        ok: false,
+        codigo: 'VALIDACION',
+        campo: 'codigo',
+        error: 'Ingrese el código numérico de 6 dígitos enviado a su correo.',
+      });
+      return;
+    }
+
+    const record = recoveryCodes.get(correo);
+    if (!record || Date.now() > record.expiraEn) {
+      recoveryCodes.delete(correo);
+      res.status(400).json({
+        ok: false,
+        codigo: 'CODIGO_EXPIRADO',
+        campo: 'codigo',
+        error: 'El código de verificación es inválido o ha expirado. Solicite un nuevo código.',
+      });
+      return;
+    }
+
+    if (record.codigo !== codigoInput) {
+      record.intentosFallidos += 1;
+      if (record.intentosFallidos >= 5) {
+        recoveryCodes.delete(correo);
+      }
+      res.status(400).json({
+        ok: false,
+        codigo: 'CODIGO_INVALIDO',
+        campo: 'codigo',
+        error: 'El código ingresado es incorrecto. Verifique los 6 dígitos o reenvíe un nuevo código.',
+      });
+      return;
+    }
+
+    record.verificado = true;
+    res.json({
+      ok: true,
+      mensaje: 'Código de verificación validado correctamente.',
+    });
   });
 
   app.post('/api/auth/reset-password', (req: Request, res: Response) => {

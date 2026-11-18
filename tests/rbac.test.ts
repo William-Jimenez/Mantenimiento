@@ -524,12 +524,48 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
   // ==========================================================================
   // 5. Pruebas de Recuperación y Cambio de Contraseña (/recuperar-contrasena)
   // ==========================================================================
-  it('permite acceder a la ruta dedicada de cambio de contraseña y restablecer la clave de una cuenta existente', async () => {
+  it('permite acceder a la ruta dedicada de cambio de contraseña y restablecer la clave de una cuenta existente en dos pasos por correo', async () => {
     // Un usuario anónimo puede navegar a /recuperar-contrasena y /cuenta/contrasena desde el enlace del módulo "¿Olvidó su contraseña?"
     assert.equal(tienePermisoRuta(null, '/recuperar-contrasena'), true);
     assert.equal(tienePermisoRuta(null, '/cuenta/contrasena'), true);
 
-    // Restablecimiento exitoso con correo registrado y nueva contraseña válida
+    // Paso 1: Si el correo no existe, devuelve 404 con mensaje amigable
+    const resNoExiste = await apiRequest('/api/auth/recovery/send-code', {
+      method: 'POST',
+      body: { correo: 'no.registrado@empresa.com' },
+    });
+    assert.equal(resNoExiste.status, 404);
+    assert.equal(resNoExiste.body.ok, false);
+
+    // Paso 1: Si el correo existe, genera y envía el código OTP de 6 dígitos
+    const resSendCode = await apiRequest('/api/auth/recovery/send-code', {
+      method: 'POST',
+      body: { correo: 'mateo.rojas@empresa.com' },
+    });
+    assert.equal(resSendCode.status, 200);
+    assert.equal(resSendCode.body.ok, true);
+    assert.match(resSendCode.body.codigoSimulado, /^\d{6}$/);
+
+    // Paso 2: Si el código es incorrecto, devuelve 400
+    const resBadCode = await apiRequest('/api/auth/recovery/verify-code', {
+      method: 'POST',
+      body: { correo: 'mateo.rojas@empresa.com', codigo: '000000' },
+    });
+    assert.equal(resBadCode.status, 400);
+    assert.equal(resBadCode.body.ok, false);
+
+    // Paso 2: Con el código correcto de 6 dígitos, valida exitosamente
+    const resVerifyCode = await apiRequest('/api/auth/recovery/verify-code', {
+      method: 'POST',
+      body: {
+        correo: 'mateo.rojas@empresa.com',
+        codigo: resSendCode.body.codigoSimulado,
+      },
+    });
+    assert.equal(resVerifyCode.status, 200);
+    assert.equal(resVerifyCode.body.ok, true);
+
+    // Paso 3: Restablecimiento exitoso con correo registrado y nueva contraseña válida
     const resReset = await apiRequest('/api/auth/reset-password', {
       method: 'POST',
       body: {

@@ -175,10 +175,15 @@ interface AppContextValue {
   };
   logout: (motivo?: string) => void;
   cambiarPasswordInicial: (nuevaPassword: string, confirmacion: string) => ActionResult;
+  solicitarCodigoRecuperacion: (
+    correo: string
+  ) => ActionResult<{ codigoSimulado: string; expiraEn: number }>;
+  verificarCodigoRecuperacion: (correo: string, codigo: string) => ActionResult;
   restablecerPasswordPorCorreo: (
     correo: string,
     nuevaPassword: string,
-    confirmacion: string
+    confirmacion: string,
+    options?: { stayOnPage?: boolean }
   ) => ActionResult;
 
   // M1 Empleados & Usuarios (RS-01, RS-04)
@@ -401,6 +406,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [language, pathname, state]);
 
   const submissionCacheRef = useRef<Map<string, Solicitud>>(new Map());
+  const recoveryCodesRef = useRef<
+    Map<
+      string,
+      {
+        codigo: string;
+        expiraEn: number;
+        intentosFallidos: number;
+        verificado: boolean;
+      }
+    >
+  >(new Map());
 
   useEffect(() => {
     try {
@@ -919,8 +935,128 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [currentUser, intendedPath, navigate, pushToast]
   );
 
+  const solicitarCodigoRecuperacion = useCallback(
+    (correo: string): ActionResult<{ codigoSimulado: string; expiraEn: number }> => {
+      const cleanCorreo = correo.trim().toLowerCase();
+      if (!cleanCorreo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanCorreo)) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'correo',
+          error: 'Ingrese un correo electrónico válido.',
+        };
+      }
+
+      const normalized =
+        cleanCorreo === 'empleado@empresa.com' ? 'cliente@empresa.com' : cleanCorreo;
+      const empleado = state.empleados.find(
+        (e) => e.correo.toLowerCase() === normalized && e.activo
+      );
+      const usuario = empleado
+        ? state.usuarios.find((u) => u.empleadoId === empleado.id && u.activo)
+        : undefined;
+
+      if (!empleado || !usuario) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'correo',
+          error:
+            'Este correo electrónico no se encuentra registrado en el sistema. Puede crear una cuenta nueva o comunicarse con soporte técnico / el Administrador.',
+        };
+      }
+
+      // Generar código OTP de 6 dígitos numéricos con vigencia de 10 minutos
+      const codigo = String(Math.floor(100000 + Math.random() * 900000));
+      const expiraEn = Date.now() + 10 * 60 * 1000;
+
+      recoveryCodesRef.current.set(normalized, {
+        codigo,
+        expiraEn,
+        intentosFallidos: 0,
+        verificado: false,
+      });
+
+      return {
+        ok: true,
+        data: {
+          codigoSimulado: codigo,
+          expiraEn,
+        },
+      };
+    },
+    [state.empleados, state.usuarios]
+  );
+
+  const verificarCodigoRecuperacion = useCallback(
+    (correo: string, codigoInput: string): ActionResult => {
+      const cleanCorreo = correo.trim().toLowerCase();
+      const normalized =
+        cleanCorreo === 'empleado@empresa.com' ? 'cliente@empresa.com' : cleanCorreo;
+      const cleanCodigo = codigoInput.trim();
+
+      if (!/^\d{6}$/.test(cleanCodigo)) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'codigo',
+          error: 'Ingrese el código numérico de 6 dígitos enviado a su correo.',
+        };
+      }
+
+      const record = recoveryCodesRef.current.get(normalized);
+      if (!record) {
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'codigo',
+          error: 'No hay un código activo para este correo. Solicite el reenvío de un nuevo código.',
+        };
+      }
+
+      if (Date.now() > record.expiraEn) {
+        recoveryCodesRef.current.delete(normalized);
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'codigo',
+          error: 'El código de verificación ha expirado (validez de 10 minutos). Solicite un nuevo código.',
+        };
+      }
+
+      if (record.codigo !== cleanCodigo) {
+        record.intentosFallidos += 1;
+        if (record.intentosFallidos >= 5) {
+          recoveryCodesRef.current.delete(normalized);
+          return {
+            ok: false,
+            codigo: 'VALIDACION',
+            campo: 'codigo',
+            error:
+              'Ha superado el número máximo de intentos permitidos (5). Por seguridad, el código fue invalidado; solicite uno nuevo.',
+          };
+        }
+        return {
+          ok: false,
+          codigo: 'VALIDACION',
+          campo: 'codigo',
+          error: `El código ingresado es incorrecto. Verifique los 6 dígitos o reenvíe un nuevo código (intento ${record.intentosFallidos} de 5).`,
+        };
+      }
+
+      record.verificado = true;
+      return { ok: true };
+    },
+    []
+  );
+
   const restablecerPasswordPorCorreo = useCallback(
-    (correo: string, nuevaPassword: string, confirmacion: string): ActionResult => {
+    (
+      correo: string,
+      nuevaPassword: string,
+      confirmacion: string,
+      options?: { stayOnPage?: boolean }
+    ): ActionResult => {
       const cleanCorreo = correo.trim().toLowerCase();
       if (!cleanCorreo) {
         return {
@@ -969,6 +1105,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       const passwordHasheada = hashPassword(nuevaPassword);
+      recoveryCodesRef.current.delete(normalized);
+
       setState((prev) => ({
         ...prev,
         usuarios: prev.usuarios.map((u) =>
@@ -985,10 +1123,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
 
       setLoginNotice(
-        'Contraseña restablecida correctamente. Ya puede iniciar sesión con su nueva clave.'
+        'Tu contraseña ha sido restablecida con éxito. Ya puedes iniciar sesión con tu nueva clave.'
       );
-      pushToast('exito', 'Contraseña actualizada con éxito.');
-      navigate('/login', { replace: true });
+      pushToast('exito', 'Tu contraseña ha sido restablecida con éxito.');
+      if (!options?.stayOnPage) {
+        navigate('/login', { replace: true });
+      }
       return { ok: true };
     },
     [state.empleados, state.usuarios, navigate, pushToast]
@@ -2296,6 +2436,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     registrarCuenta,
     logout,
     cambiarPasswordInicial,
+    solicitarCodigoRecuperacion,
+    verificarCodigoRecuperacion,
     restablecerPasswordPorCorreo,
     guardarEmpleado,
     toggleTecnicoEmpleado,
