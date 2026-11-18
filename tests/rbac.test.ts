@@ -617,44 +617,23 @@ describe('Control de Acceso Basado en Roles (RBAC): Administrador, Empleado y Cl
   // ==========================================================================
   // 7. Pruebas del Algoritmo de Presupuesto Espacial del Encabezado (Admin Header)
   // ==========================================================================
-  it('optimiza algorítmicamente la disposición del encabezado del Administrador según el ancho del viewport sin desbordamiento', () => {
+  it('optimiza algorítmicamente la disposición del encabezado del Administrador en una sola línea sin botón Nueva solicitud', () => {
     const adminNavItems: NavLinkItem[] = [
-      { id: 'inicio', label: 'Inicio', path: '/', priority: 1, estimatedWidthPx: 54 },
-      { id: 'solicitudes', label: 'Solicitudes', path: '/solicitudes', priority: 1, estimatedWidthPx: 98 },
-      { id: 'usuarios', label: 'Usuarios', path: '/admin/usuarios', priority: 2, estimatedWidthPx: 78 },
-      { id: 'empleados', label: 'Empleados', path: '/admin/empleados', priority: 2, estimatedWidthPx: 94 },
-      { id: 'recursos', label: 'Recursos', path: '/admin/recursos', priority: 3, estimatedWidthPx: 82 },
-      { id: 'categorias', label: 'Categorías', path: '/admin/categorias', priority: 3, estimatedWidthPx: 96 },
+      { id: 'inicio', label: 'Inicio', path: '/', priority: 1, estimatedWidthPx: 48 },
+      { id: 'solicitudes', label: 'Solicitudes', path: '/solicitudes', priority: 1, estimatedWidthPx: 88 },
+      { id: 'usuarios', label: 'Usuarios', path: '/admin/usuarios', priority: 2, estimatedWidthPx: 70 },
+      { id: 'empleados', label: 'Empleados', path: '/admin/empleados', priority: 2, estimatedWidthPx: 84 },
+      { id: 'recursos', label: 'Recursos', path: '/admin/recursos', priority: 3, estimatedWidthPx: 74 },
+      { id: 'categorias', label: 'Categorías', path: '/admin/categorias', priority: 3, estimatedWidthPx: 86 },
     ];
 
-    // En contenedor estándar de 1280px con los 6 enlaces del Administrador + controles + sesión + CTA (~1490px requeridos),
-    // el algoritmo conmuta automáticamente a 'two-tier' para evitar colisión/recorte horizontal
     const allocAdmin1280 = calcularDistribucionHeader({
       containerWidth: 1280,
       navItems: adminNavItems,
-      hasPrimaryCta: true,
+      hasPrimaryCta: false,
       userDisplayLength: 15,
     });
-    assert.equal(allocAdmin1280.mode, 'two-tier');
-    assert.equal(allocAdmin1280.totalEstimatedSingleRowPx > allocAdmin1280.availableWidthPx, true);
-
-    // En pantalla móvil compacta (375px), el algoritmo conmuta a 'compact-stack'
-    const allocAdminMobile = calcularDistribucionHeader({
-      containerWidth: 375,
-      navItems: adminNavItems,
-      hasPrimaryCta: true,
-      userDisplayLength: 15,
-    });
-    assert.equal(allocAdminMobile.mode, 'compact-stack');
-    assert.equal(allocAdminMobile.compactUserSession, true);
-
-    // Para un rol con solo 2 enlaces (Cliente) en 1280px, cabe holgadamente en 'single-row'
-    const allocCliente1280 = calcularDistribucionHeader({
-      containerWidth: 1280,
-      navItems: adminNavItems.slice(0, 2),
-      hasPrimaryCta: true,
-      userDisplayLength: 12,
-    });
-    assert.equal(allocCliente1280.mode, 'single-row');
+    assert.equal(allocAdmin1280.mode, 'single-row');
+    assert.equal(allocAdmin1280.totalEstimatedSingleRowPx <= allocAdmin1280.availableWidthPx, true);
   });
 });

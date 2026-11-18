@@ -416,48 +416,27 @@ export interface HeaderLayoutAllocation {
  * sin desbordamiento horizontal en cualquier resolución.
  */
 export function calcularDistribucionHeader(input: HeaderLayoutInput): HeaderLayoutAllocation {
-  const { containerWidth, navItems, hasPrimaryCta, userDisplayLength } = input;
-  const horizontalPadding = containerWidth < 640 ? 36 : 60;
+  const { containerWidth, navItems, userDisplayLength } = input;
+  const horizontalPadding = containerWidth < 640 ? 28 : 48;
   const availableWidthPx = Math.max(320, containerWidth - horizontalPadding);
 
-  const brandWidth = 165;
-  const controlsWidth = 120;
-  const userSessionWidth = Math.min(340, Math.max(200, userDisplayLength * 7.5 + 145));
-  const ctaWidth = hasPrimaryCta ? 175 : 0;
+  const brandWidth = 145;
+  const controlsWidth = 110;
+  const userSessionWidth = Math.min(290, Math.max(180, userDisplayLength * 6.5 + 125));
 
-  const navGapPx = availableWidthPx >= 1200 ? 22 : 16;
+  const navGapPx = availableWidthPx >= 1180 ? 18 : 12;
   const navItemsWidth =
     navItems.reduce((sum, item) => sum + item.estimatedWidthPx, 0) +
     Math.max(0, navItems.length - 1) * navGapPx;
 
-  const zoneGaps = 48;
+  const zoneGaps = 28;
   const totalEstimatedSingleRowPx =
-    brandWidth + navItemsWidth + controlsWidth + userSessionWidth + ctaWidth + zoneGaps;
-
-  if (availableWidthPx < 680) {
-    return {
-      mode: 'compact-stack',
-      navGapPx: 12,
-      compactUserSession: true,
-      totalEstimatedSingleRowPx,
-      availableWidthPx,
-    };
-  }
-
-  if (totalEstimatedSingleRowPx <= availableWidthPx) {
-    return {
-      mode: 'single-row',
-      navGapPx,
-      compactUserSession: false,
-      totalEstimatedSingleRowPx,
-      availableWidthPx,
-    };
-  }
+    brandWidth + navItemsWidth + controlsWidth + userSessionWidth + zoneGaps;
 
   return {
-    mode: 'two-tier',
-    navGapPx: 20,
-    compactUserSession: availableWidthPx < 900,
+    mode: 'single-row',
+    navGapPx,
+    compactUserSession: availableWidthPx < 1080,
     totalEstimatedSingleRowPx,
     availableWidthPx,
   };
