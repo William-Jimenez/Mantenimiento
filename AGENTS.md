@@ -1,16 +1,16 @@
 # Directrices para Agentes de Desarrollo y QA
 
-## Reglas de Ejecución de Pruebas en Rama `qa`
+## Flujo de Trabajo de 3 Ramas (`dev` -> `qa` -> `main`)
 
-1. **Servicio de Pruebas en `qa`:**
-   - Al situarse en la rama `qa` para ejecutar o validar pruebas, se debe utilizar **Jules** como servicio de pruebas en lugar de **Composio**.
-   - Comando de ejecución: `npm run test:jules` (o `npm run test:qa`).
+1. **Ciclo de Desarrollo Escalonado:**
+   - **Rama `dev` (Desarrollo):** Todo nuevo cambio, componente o funcionalidad se desarrolla y prueba inicialmente en la rama `dev`. En esta rama se mantiene la ejecución estándar de pruebas (`npm test`).
+   - **Rama `qa` (Aseguramiento de Calidad):** Tras finalizar el desarrollo en `dev`, los cambios se incorporan a `qa`. En `qa`, es mandatorio validar con **Jules** (`npm run test:jules` o `npm run test:qa`) en lugar de Composio.
+   - **Rama `main` (Producción / Estable):** Únicamente tras obtener el veredicto `✅ APROBADO` en `qa`, los cambios se integran en la rama `main`.
+   - **Sincronización con GitHub:** Cuando las pruebas en `qa` resulten exitosas y se actualicen las ramas, se sincronizan todas las ramas correspondientes (`dev`, `qa` y `main`) con el repositorio remoto (`git push`).
+
+2. **Servicio de Pruebas en `qa` (Jules):**
    - El script `scripts/jules-qa-runner.ts` orquesta la suite de pruebas local (`tests/rbac.test.ts`), analiza la rama activa, valida las reglas RBAC y genera el reporte formal de QA compatible con Jules.
    - Si la variable de entorno `JULES_API_KEY` está configurada en `.env`, el runner conecta automáticamente con la sesión de triage de `@google/jules-sdk`. Si no está configurada, las pruebas se ejecutan y validan localmente sin bloquear el flujo.
-   - **Sincronización con GitHub:** Si las pruebas ejecutadas con Jules salen bien (`✅ APROBADO`), se deben sincronizar todos los cambios y ramas correspondientes con el repositorio remoto en GitHub (`git push`).
-
-2. **Otras ramas:**
-   - En ramas distintas a `qa` (por ejemplo `main` o `dev`), se mantiene la ejecución estándar (`npm test`).
 
 ## Reglas de Mantenimiento Autónomo de Documentación
 
