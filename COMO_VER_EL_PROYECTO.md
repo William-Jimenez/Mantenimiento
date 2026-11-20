@@ -9,6 +9,7 @@ Este documento detalla paso a paso el proceso para instalar, configurar y levant
 * **Frontend:** TypeScript / JavaScript (ES Modules), React 19, Vite 8, Tailwind CSS v4
 * **Backend Spring Boot (`/backend`):** Java 21, Spring Boot 3.4, Spring Data JPA (Hibernate), Spring Security + JWT (Bearer Token) + BCrypt
 * **Base de Datos Relacional:** PostgreSQL 16 (`docker-compose.yml` y `backend/sql/schema-postgresql.sql`)
+* **Servidor Web / Producción:** Microsoft IIS (Internet Information Services) en Windows Server con soporte para Reverse Proxy (ARR), iisnode y SPA estática ([docs/DESPLIEGUE_IIS.md](docs/DESPLIEGUE_IIS.md))
 * **Pruebas de API y Contrato Técnico:** Contrato formal de Endpoints REST ([docs/documentacion_endpoints.md](docs/documentacion_endpoints.md)), Colección y entorno Postman (`postman/`) y Suite QA con Jules (`tests/rbac.test.ts`)
 * **Librerías adicionales:** Motion (animaciones), Lucide React (iconos), Google GenAI SDK
 
@@ -196,3 +197,18 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=test"
    * `postman/Solicitudes_Mantenimiento_Local.postman_environment.json`
 3. Selecciona el entorno **Solicitudes Mantenimiento - Local (Spring Boot 8080)**.
 4. Ejecuta primero **2. Autenticación y Roles (JWT) -> Login Administrador (Guarda Token)**. El script de Postman guardará automáticamente el token JWT en `{{jwt_token}}` y `{{admin_token}}` para probar todo el CRUD de solicitudes (`/api/solicitudes`), recursos (`/api/recursos`) y usuarios (`/api/usuarios`).
+
+---
+
+## 9. Despliegue en Servidores de Producción con Microsoft IIS
+
+Para desplegar la aplicación en Windows Server o Windows con Internet Information Services (IIS):
+
+1. **Despliegue automatizado con PowerShell:**
+   ```powershell
+   npm.cmd run deploy:iis
+   ```
+   *(O ejecuta `powershell -ExecutionPolicy Bypass -File scripts/deploy-iis.ps1 -Port 8081 -DeploymentMode ReverseProxy`)*.
+
+2. **Guía completa y configuraciones avanzadas:**
+   Consulta el documento oficial [docs/DESPLIEGUE_IIS.md](docs/DESPLIEGUE_IIS.md) para conocer las arquitecturas disponibles (Reverse Proxy con ARR, iisnode nativo y Static SPA), configuración de Application Pools sin código administrado, permisos de carpetas para `IIS_IUSRS` y validación de endpoints en IIS.
