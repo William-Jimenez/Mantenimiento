@@ -23,7 +23,7 @@ param(
     [string]$SiteName = "MantenimientoApp",
     [string]$AppPoolName = "MantenimientoPool",
     [int]$Port = 8081,
-    [ValidateSet("ReverseProxy", "iisnode", "StaticSpa")]
+    [ValidateSet("ReverseProxy", "iisnode", "StaticSpa", "NativeNoModules")]
     [string]$DeploymentMode = "ReverseProxy"
 )
 
@@ -68,6 +68,14 @@ Write-Host "[OK] Compilacion finalizada con exito." -ForegroundColor Green
 
 # 3. Preparacion de Archivos segun el Modo de Despliegue
 Write-Host "`n[2/5] Ajustando web.config segun modo: $DeploymentMode..." -ForegroundColor Green
+$HasUrlRewrite = (Test-Path "$env:SystemRoot\System32\inetsrv\rewrite.dll") -or (Test-Path "$env:ProgramFiles\IIS\URL Rewrite")
+if (-not $HasUrlRewrite -and ($DeploymentMode -eq "ReverseProxy" -or $DeploymentMode -eq "iisnode" -or $DeploymentMode -eq "StaticSpa")) {
+    Write-Warning "AVISO: El modulo oficial 'IIS URL Rewrite' no esta instalado en este servidor."
+    Write-Warning "IIS arrojara Error HTTP 500.19 (0x8007000d) si web.config contiene etiquetas <rewrite>."
+    Write-Warning "Para instalarlo ejecuta: npm run install:rewrite (o ejecuta $env:TEMP\rewrite_amd64_es-ES.msi)"
+    Write-Warning "O ejecuta el despliegue nativo sin modulos: .\scripts\deploy-iis.ps1 -DeploymentMode NativeNoModules"
+}
+
 switch ($DeploymentMode) {
     "ReverseProxy" {
         Copy-Item -Path "$ProjectRoot\iis\web.reverse-proxy.config" -Destination "$ProjectRoot\web.config" -Force
@@ -82,6 +90,10 @@ switch ($DeploymentMode) {
         if (-not (Test-Path "$PhysicalPath\web.config")) {
             Copy-Item -Path "$ProjectRoot\dist\web.config" -Destination "$PhysicalPath\web.config" -Force
         }
+    }
+    "NativeNoModules" {
+        Copy-Item -Path "$ProjectRoot\iis\web.native-no-modules.config" -Destination "$ProjectRoot\web.config" -Force
+        $PhysicalPath = $ProjectRoot
     }
 }
 

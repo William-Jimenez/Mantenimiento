@@ -187,3 +187,33 @@ npm.cmd run build:server
 ```
 
 El reinicio del Application Pool no interrumpe el servicio por más de 1 a 2 segundos gracias a la rotación de procesos de trabajo (*Worker Processes*) de IIS.
+
+---
+
+## 9. Preguntas Frecuentes y Solución de Errores Comunes en IIS
+
+### Error HTTP 500.19 (Código de Error: `0x8007000d` / Módulo: `IIS Web Core`)
+* **Síntoma:** Al abrir `http://localhost:8081` en el navegador aparece la pantalla roja:  
+  `Error HTTP 500.19 - Internal Server Error`  
+  `No se puede obtener acceso a la página solicitada porque los datos de configuración relacionados de la página no son válidos.`  
+  `Código de error: 0x8007000d`  
+  `Archivo de configuración: \\?\...\web.config`
+* **Causa:** IIS Web Core no reconoce la etiqueta `<rewrite>` porque el módulo oficial **IIS URL Rewrite Module** aún no está instalado en el servidor Windows.
+* **Solución Rápida (1 minuto):**
+  1. Ejecuta el script asistente para instalar el módulo oficial con elevación:
+     ```powershell
+     npm.cmd run install:rewrite
+     ```
+  2. O instala manualmente el paquete oficial ya descargado en tu sistema:  
+     Doble clic en `C:\Users\Willy\AppData\Local\Temp\rewrite_amd64_es-ES.msi` (o descárgalo desde [Microsoft IIS URL Rewrite](https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_es-ES.msi)).
+  3. Abre una terminal como Administrador y reinicia IIS:
+     ```powershell
+     iisreset
+     ```
+  4. Recarga `http://localhost:8081/` en tu navegador.
+* **Solución Alternativa (Sin instalar ningún módulo externo):**
+  Si estás en un entorno restringido donde no puedes instalar extensiones en IIS, utiliza la plantilla nativa [iis/web.native-no-modules.config](file:///c:/Users/Willy/Desktop/Repositorios/Mantenimiento/iis/web.native-no-modules.config):
+  ```powershell
+  Copy-Item iis\web.native-no-modules.config web.config -Force
+  iisreset
+  ```
