@@ -267,5 +267,5 @@ El servidor Express usado en desarrollo (puerto `3000`) y en `tests/rbac.test.ts
 | Gestión de empleados | `/api/empleados/**` | `/api/admin/empleados/**` |
 | Crear/editar recursos | `POST/PUT /api/recursos/**` | `POST/PUT /api/admin/recursos/**` |
 | Asignar técnico | `PATCH /api/solicitudes/{id}/asignar` | `POST /api/admin/solicitudes/:id/asignar` |
-| Bandeja y trabajo técnico | `GET /api/solicitudes`, `PATCH /api/solicitudes/{id}/estado` | `GET /api/tecnico/solicitudes`, `PATCH /api/tecnico/solicitudes/:id/trabajo` y `/estado` |
+| Bandeja y trabajo técnico | `GET /api/solicitudes`, `PATCH /api/solicitudes/{id}/estado` | `GET /api/tecnico/solicitudes`, `POST /api/tecnico/solicitudes/:id/trabajo`, `PATCH /api/tecnico/solicitudes/:id/estado` |
 | Análisis IA (admin) | `POST /api/solicitudes/{id}/analisis-ia` | `POST /api/admin/solicitudes/:id/analisis-ia` |

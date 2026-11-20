@@ -83,9 +83,10 @@ Este documento describe únicamente los módulos críticos, complejos o con deci
 
 ## 4. Pruebas y Automatización (`tests/`, `scripts/`)
 
-### 4.1 Suite RBAC (`tests/rbac.test.ts`)
-* Ejecutada con el test runner nativo de Node (`tsx --test tests/rbac.test.ts`, sin Jest ni Vitest).
-* Valida en 15 casos: guardas de rutas UI (`tienePermisoRuta`), bloqueo HTTP `403` en `apiApp.ts`, sanitización de respuestas para `CLIENTE`, registro y duplicados (`409`), política de contraseñas (`400`), recuperación en dos pasos, diccionario i18n, estructura de archivos del backend Spring Boot y criterios `HU-01` a `HU-20`.
+### 4.1 Suites de Pruebas (`tests/rbac.test.ts`, `tests/integration.test.ts`)
+* Ejecutadas con el test runner nativo de Node (`tsx --test tests/rbac.test.ts tests/integration.test.ts`, sin Jest ni Vitest).
+* `tests/rbac.test.ts` (15 casos): valida guardas de rutas UI (`tienePermisoRuta`), bloqueo HTTP `403` en `apiApp.ts`, sanitización de respuestas para `CLIENTE`, registro y duplicados (`409`), política de contraseñas (`400`), recuperación en dos pasos, diccionario i18n, estructura del backend Spring Boot y criterios `HU-01` a `HU-20`.
+* `tests/integration.test.ts` (3 casos): valida integración extremo a extremo de `MaintenanceApiClient` (`fetch()`) contra `apiApp.ts` y `geminiAiService.ts` (ciclo completo registro → creación → IA → revisión → asignación → trabajo técnico → cierre, CRUD de recursos con `403`/`409`, y resiliencia ante errores de red).
 
 ### 4.2 Runner QA Jules (`scripts/jules-qa-runner.ts`)
 * Lee la rama activa directamente desde `.git/HEAD` (con fallback a `GIT_BRANCH` / `BRANCH_NAME`).

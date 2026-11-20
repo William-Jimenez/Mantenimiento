@@ -13,7 +13,7 @@
     "install:rewrite": "powershell -ExecutionPolicy Bypass -File scripts/install-url-rewrite.ps1",
     "clean": "rm -rf dist server.js server.cjs server.mjs",
     "lint": "tsc --noEmit",
-    "test": "tsx --test tests/rbac.test.ts",
+    "test": "tsx --test tests/rbac.test.ts tests/integration.test.ts",
     "test:jules": "tsx scripts/jules-qa-runner.ts",
     "test:qa": "tsx scripts/jules-qa-runner.ts"
   },

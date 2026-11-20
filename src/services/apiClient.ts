@@ -219,7 +219,7 @@ export class MaintenanceApiClient {
 
   async registerTrabajo(solicitudId: number, trabajoRealizado: string) {
     return this.request<Solicitud>(
-      'PATCH',
+      'POST',
       `/api/tecnico/solicitudes/${solicitudId}/trabajo`,
       { trabajoRealizado }
     );

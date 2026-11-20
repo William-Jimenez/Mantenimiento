@@ -73,7 +73,7 @@ npm.cmd run dev
 # 3. Verificación de tipos TypeScript
 npm.cmd run lint
 
-# 4. Ejecutar suite de pruebas (15 pruebas RBAC y criterios HU-01 a HU-20)
+# 4. Ejecutar suite de pruebas RBAC e integración end-to-end (18 pruebas)
 npm.cmd test
 
 # 5. Ejecutar validación QA con Jules (obligatoria en rama qa)

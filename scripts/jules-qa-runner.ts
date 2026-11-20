@@ -46,12 +46,12 @@ async function runLocalTestSuite(): Promise<TestRunResult> {
   return new Promise((resolveResult) => {
     const isWindows = process.platform === 'win32';
     const child = isWindows
-      ? spawn('cmd.exe', ['/c', 'npx', 'tsx', '--test', 'tests/rbac.test.ts'], {
+      ? spawn('cmd.exe', ['/c', 'npx', 'tsx', '--test', 'tests/rbac.test.ts', 'tests/integration.test.ts'], {
           cwd: process.cwd(),
           env: { ...process.env },
           stdio: ['inherit', 'pipe', 'pipe'],
         })
-      : spawn('npx', ['tsx', '--test', 'tests/rbac.test.ts'], {
+      : spawn('npx', ['tsx', '--test', 'tests/rbac.test.ts', 'tests/integration.test.ts'], {
           cwd: process.cwd(),
           env: { ...process.env },
           stdio: ['inherit', 'pipe', 'pipe'],
