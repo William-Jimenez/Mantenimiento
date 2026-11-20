@@ -12,8 +12,8 @@ export interface GeminiAnalysisParams {
   categorias: Categoria[];
   prioridades: Prioridad[];
   sugerenciaExterna?: {
-    categoriaNombre?: string;
-    prioridadNombre?: string;
+    categoriaIdOrNombre?: string | number | null;
+    prioridadIdOrNombre?: string | number | null;
   };
 }
 
@@ -125,8 +125,10 @@ export async function analizarSolicitudConGemini(
     };
 
     const validacion = validarSugerenciaIaContraCatalogo(
-      parsed.categoriaNombre ?? null,
-      parsed.prioridadNombre ?? null,
+      {
+        categoriaIdOrNombre: parsed.categoriaNombre ?? null,
+        prioridadIdOrNombre: parsed.prioridadNombre ?? null,
+      },
       params.categorias,
       params.prioridades
     );
