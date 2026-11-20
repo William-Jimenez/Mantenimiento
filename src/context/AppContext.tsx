@@ -59,6 +59,7 @@ import {
   ThemeMode,
   translateText,
 } from '../i18n/translations';
+import { apiClient } from '../services/apiClient';
 
 const STORAGE_KEY = 'plataforma_mantenimiento_v2';
 const INACTIVITY_WARNING_MS = 28 * 60 * 1000;
@@ -503,6 +504,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(
     (motivo?: string) => {
+      apiClient.clearAuthToken();
       setState((prev) => ({ ...prev, session: null }));
       setSessionExpiringSoon(false);
       setIntendedPath(null);
@@ -752,6 +754,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
       setLoginNotice(null);
 
+      // Sincroniza sesión con la API REST para obtener token Bearer
+      void apiClient.login(normalized, password);
+
       if (usuario.debeCambiarPassword) {
         navigate('/cuenta/contrasena', { replace: true });
       } else if (intendedPath && intendedPath !== '/login') {
@@ -860,6 +865,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }));
 
         setLoginNotice(null);
+        void apiClient.register({
+          nombres: clean.nombres,
+          apellidos: clean.apellidos,
+          documento: clean.documento,
+          correo: clean.correo,
+          password: clean.password,
+        });
         pushToast('exito', `Cuenta creada exitosamente. Bienvenido/a, ${clean.nombres}.`);
         navigate('/', { replace: true });
 
@@ -1959,6 +1971,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
 
       pushToast('exito', `Solicitud ${nuevaSolicitud.codigo} registrada.`);
+      void apiClient.createSolicitud({
+        recursoId: nuevaSolicitud.recursoId,
+        descripcion: nuevaSolicitud.descripcion,
+        solicitanteId: nuevaSolicitud.solicitanteId,
+        categoriaId: nuevaSolicitud.categoriaId,
+        prioridadId: nuevaSolicitud.prioridadId,
+      });
       return { ok: true, data: nuevaSolicitud };
     },
     [
@@ -2119,6 +2138,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
 
       pushToast('exito', 'Trabajo realizado registrado correctamente.');
+      void apiClient.registerTrabajo(solicitudId, textoClean);
       return { ok: true };
     },
     [currentUser, currentEmpleado, state.solicitudes, state.asignaciones, state.historial, pushToast]
@@ -2200,6 +2220,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
 
       pushToast('exito', `Técnico ${tecnico.nombres} ${tecnico.apellidos} asignado.`);
+      void apiClient.assignTecnico(solicitudId, { tecnicoId });
       return { ok: true };
     },
     [currentUser, state.solicitudes, state.empleados, state.asignaciones, state.historial, pushToast]
@@ -2310,6 +2331,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
 
       pushToast('exito', `Estado actualizado a ${destino}.`);
+      void apiClient.updateSolicitudEstado(solicitudId, {
+        nuevoEstado: destino,
+        motivo: motivoClean,
+        version: expectedVersion,
+      });
       return { ok: true };
     },
     [currentUser, currentEmpleado, state.solicitudes, state.asignaciones, state.historial, pushToast]
@@ -2357,6 +2383,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         analisisIa: [...prev.analisisIa, nuevo],
       }));
       pushToast('exito', `Análisis v${nextVersion} enviado a cola.`);
+
+      // Solicita inferencia real a la API REST (Gemini / fallback en servidor)
+      void apiClient.triggerAnalisisIa(solicitudId).then((res) => {
+        if (res.ok && res.data) {
+          const remote = res.data;
+          setState((prev) => ({
+            ...prev,
+            analisisIa: prev.analisisIa.map((a) =>
+              a.id === nextId
+                ? {
+                    ...a,
+                    estadoAnalisis: remote.estadoAnalisis,
+                    tipoDano: remote.tipoDano,
+                    descripcionObservada: remote.descripcionObservada,
+                    categoriaSugeridaId: remote.categoriaSugeridaId,
+                    prioridadSugeridaId: remote.prioridadSugeridaId,
+                    modelo: remote.modelo,
+                    completadoEn: remote.completadoEn,
+                    errorDetalle: remote.errorDetalle,
+                  }
+                : a
+            ),
+          }));
+        }
+      });
+
       return { ok: true };
     },
     [currentUser, state.iaHabilitada, state.solicitudes, state.analisisIa, pushToast]
@@ -2438,6 +2490,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
 
       pushToast('exito', `Revisión de análisis registrada (${decision}).`);
+      void apiClient.reviewAnalisisIa(solicitudId, analisisId, {
+        decision,
+        categoriaId: catFinal,
+        prioridadId: prioFinal,
+      });
       return { ok: true };
     },
     [currentUser, state.solicitudes, state.analisisIa, pushToast]

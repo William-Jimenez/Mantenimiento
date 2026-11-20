@@ -8,7 +8,7 @@ Aplicación web para registrar, asignar, dar seguimiento y analizar solicitudes 
 
 El repositorio contiene **tres piezas diferenciadas** que conviene entender antes de modificar cualquier archivo:
 
-1. **Frontend SPA (`src/`):** React 19 + TypeScript + Vite 8 + Tailwind CSS v4. Actualmente opera de forma **100% autónoma en el navegador** mediante `AppContext` (`src/context/AppContext.tsx`), persistiendo el estado en `localStorage` (`plataforma_mantenimiento_v2`) a partir de los datos iniciales de `src/data/seed.ts`. **No realiza peticiones `fetch()` a `/api/*` en tiempo de ejecución.**
+1. **Frontend SPA (`src/`):** React 19 + TypeScript + Vite 8 + Tailwind CSS v4. Utiliza `AppContext` (`src/context/AppContext.tsx`) con estado optimista en `localStorage` (`plataforma_mantenimiento_v2`) sincronizado con la API REST mediante el cliente HTTP tipado `src/services/apiClient.ts` (`fetch()` + `Authorization: Bearer <token>`, configurable con `VITE_API_BASE_URL` y degradación local si la API no está disponible).
 2. **API REST en Memoria con Express (`src/server/apiApp.ts`):** Implementa las reglas RBAC, autenticación y ciclo de vida de solicitudes sobre un `BackendStore` en memoria. Se monta como middleware en Vite (`vite.config.ts`) en desarrollo, se empaqueta en `src/server/productionServer.ts` para producción/IIS, y es la base que valida la suite `tests/rbac.test.ts`.
 3. **Backend Spring Boot + PostgreSQL (`backend/`):** API REST Java 21 / Spring Boot 3.4 con JWT stateless, BCrypt, 12 entidades JPA y PostgreSQL 16 (o H2 en el perfil `test`).
 
@@ -107,7 +107,7 @@ El repositorio sigue un ciclo estricto de 3 ramas:
 
 Al revisar el proyecto completo se detectaron los siguientes puntos que conviene tener presentes para no asumir comportamientos erróneos:
 
-1. **Desacople entre Frontend y APIs:** `AppContext.tsx` no consume ni `src/server/apiApp.ts` ni el backend Spring Boot; toda la UI trabaja sobre `localStorage`. Si se desea conectar la UI a la API real, será necesario reemplazar las mutaciones locales de `AppContext.tsx` por llamadas `fetch()`.
+1. **Sincronización híbrida Frontend–API:** `AppContext.tsx` sincroniza login, registro, creación/actualización de solicitudes, asignaciones, trabajo técnico y análisis IA con `src/server/apiApp.ts` vía `src/services/apiClient.ts`, manteniendo respaldo en `localStorage` para operación sin conexión o despliegue estático puro.
 2. **Diferencia de contratos entre `apiApp.ts` y Spring Boot (`backend/`):** Ambos implementan el dominio pero con rutas y payloads distintos (por ejemplo, `apiApp.ts` expone `/api/admin/usuarios` y `/api/auth/recovery/send-code`, mientras Spring Boot expone `/api/usuarios` y `/api/auth/password-reset/request`).
 3. **Análisis IA en backend Java (`backend/`):** El servicio Node (`src/services/geminiAiService.ts`) ya integra `@google/genai` (`gemini-2.5-flash`) con fallback local, mientras que `SolicitudService.java` en Spring Boot mantiene inferencia determinista por palabras clave.
 4. **Motor de base de datos en `docs/SRS.md`:** La sección 3.1.3 de `docs/SRS.md` menciona `MySQL versión 8.4 LTS`, pero toda la implementación (`docker-compose.yml`, `backend/pom.xml`, `backend/sql/schema-postgresql.sql` y `application.yml`) utiliza **PostgreSQL 16** (y H2 en el perfil `test`).

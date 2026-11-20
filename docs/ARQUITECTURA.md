@@ -19,7 +19,7 @@ Este documento describe únicamente los módulos críticos, complejos o con deci
 * **Decisiones no obvias que debes conocer antes de modificar `loadInitialState()`:**
   * Al cargar desde `localStorage`, `loadInitialState()` **restablece siempre** los campos `password`, `debeCambiarPassword: false`, `intentosFallidos: 0` y `bloqueadoHasta: null` del usuario administrador semilla (`id === 1 && perfil === 'ADMINISTRADOR'`) con los valores de `SEED_USUARIOS` (`src/data/seed.ts`) para evitar bloqueos irreversibles en demos locales.
   * Maneja expiración de sesión por inactividad mediante `INACTIVITY_WARNING_MS` (28 min) e `INACTIVITY_EXPIRE_MS` (30 min).
-* **Dependencias:** Consume `src/data/seed.ts`, `src/services/domainRules.ts`, `src/i18n/translations.ts` y `src/types/domain.ts`. No realiza llamadas HTTP al servidor.
+* **Dependencias:** Consume `src/data/seed.ts`, `src/services/domainRules.ts`, `src/services/apiClient.ts`, `src/i18n/translations.ts` y `src/types/domain.ts`. Las operaciones críticas (`login`, `logout`, `registrarCuenta`, `crearSolicitud`, `asignarTecnico`, `cambiarEstadoSolicitud`, `registrarTrabajoRealizado`, `solicitarNuevoAnalisisIa`, `revisarAnalisisIa`) se sincronizan vía `fetch()` contra `/api/*` usando `MaintenanceApiClient` (con `Authorization: Bearer <token>` en `sessionStorage` y fallback local transparente si la API no responde).
 
 ### 1.3 Reglas de Dominio y Seguridad (`src/services/domainRules.ts`, `src/services/passwordSecurity.ts`)
 * **Máquina de estados (`ESTADOS_ORDEN`, `ESTADOS_FINALES`, `obtenerTransicionesPermitidas`):**
