@@ -35,6 +35,7 @@ import {
   verificarFirmaBinariaEvidencia,
   verifyPassword,
 } from '../services/domainRules';
+import { analizarSolicitudConGemini } from '../services/geminiAiService';
 import {
   AnalisisIa,
   Asignacion,
@@ -1771,7 +1772,7 @@ export function createApiApp(customStore?: BackendStore) {
     '/api/admin/solicitudes/:id/analisis-ia',
     requireAuth,
     requireRole('ADMINISTRADOR'),
-    (req: Request, res: Response) => {
+    async (req: Request, res: Response) => {
       const { usuario } = req.auth!;
       const solicitudId = Number(req.params.id);
       const sol = store.solicitudes.find((s) => s.id === solicitudId);
@@ -1781,7 +1782,7 @@ export function createApiApp(customStore?: BackendStore) {
       }
 
       const rec = store.recursos.find((r) => r.id === sol.recursoId);
-      const evsCount = store.evidencias.filter((e) => e.solicitudId === sol.id).length;
+      const evsSolicitud = store.evidencias.filter((e) => e.solicitudId === sol.id);
       const prevVersiones = store.analisisIa.filter((a) => a.solicitudId === solicitudId);
       const nextVersion = Math.max(0, ...prevVersiones.map((a) => a.version)) + 1;
       const nextId = Math.max(0, ...store.analisisIa.map((a) => a.id)) + 1;
@@ -1813,15 +1814,15 @@ export function createApiApp(customStore?: BackendStore) {
         return;
       }
 
-      const inferencia = generarInferenciaAnalisisIa(
-        sol.descripcion,
-        rec?.nombre ?? '',
-        rec?.codigo ?? '',
-        evsCount,
-        store.categorias,
-        store.prioridades,
-        req.body?.sugerenciaExterna
-      );
+      const inferencia = await analizarSolicitudConGemini({
+        descripcion: sol.descripcion,
+        recursoNombre: rec?.nombre ?? '',
+        recursoCodigo: rec?.codigo ?? '',
+        evidencias: evsSolicitud,
+        categorias: store.categorias,
+        prioridades: store.prioridades,
+        sugerenciaExterna: req.body?.sugerenciaExterna,
+      });
 
       const nuevoAnalisis: AnalisisIa = {
         id: nextId,
@@ -1842,7 +1843,7 @@ export function createApiApp(customStore?: BackendStore) {
         revisadoEn: null,
       };
       store.analisisIa.push(nuevoAnalisis);
-      res.status(201).json({ ok: true, data: nuevoAnalisis });
+      res.status(201).json({ ok: true, data: nuevoAnalisis, origen: inferencia.origen });
     }
   );
 

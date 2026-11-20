@@ -33,8 +33,9 @@ Este documento describe únicamente los módulos críticos, complejos o con deci
   * Implementa `PBKDF2-HMAC-SHA256` en TypeScript puro (`sha256Bytes`, `hmacSha256`) para funcionar de forma síncrona e idéntica tanto en el navegador como en Node.js sin depender de APIs nativas distintas entre entornos.
   * Formato almacenado: `$pbkdf2-sha256$10000$<saltHex>$<hashHex>` (`PBKDF2_ITERATIONS = 10000`, `SALT_BYTES = 16`).
   * `verifyPassword()` acepta además contraseñas heredadas de prueba en texto plano únicamente si la cadena almacenada no empieza con `$pbkdf2-sha256$`.
-* **Análisis de IA (`generarInferenciaAnalisisIa`):**
-  * Recibe descripción y tipo de recurso y devuelve un diagnóstico simulado determinista por palabras clave (sin llamadas externas a Gemini).
+* **Análisis de IA (`src/services/geminiAiService.ts` y `generarInferenciaAnalisisIa`):**
+  * `analizarSolicitudConGemini()` conecta el endpoint `POST /api/admin/solicitudes/:id/analisis-ia` con `@google/genai` (`gemini-2.5-flash`) cuando `GEMINI_API_KEY` está configurada en `.env`, enviando descripción, recurso y hasta 2 fotografías adjuntas en Base64.
+  * Si no hay clave configurada o ocurre un error de red/cuota, degrada automáticamente a `generarInferenciaAnalisisIa()` (clasificación determinista por palabras clave) validando siempre la salida contra el catálogo activo con `validarSugerenciaIaContraCatalogo()`.
 
 ### 1.4 Internacionalización (`src/i18n/translations.ts`)
 * Exporta `translateText(text, language)` y persiste la preferencia en `localStorage` (`LANG_STORAGE_KEY`, `THEME_STORAGE_KEY`). Es un diccionario bidireccional ES/EN usado por pantallas y componentes.

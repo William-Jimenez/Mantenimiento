@@ -59,7 +59,7 @@ Variables definidas en `.env.example`:
 * `APP_URL`: URL base de la aplicación (`http://localhost:3000`).
 * `JULES_API_KEY`: Opcional; habilita el reporte remoto a `@google/jules-sdk` al ejecutar `npm.cmd run test:jules`.
 * `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `BACKEND_PORT`, `JWT_SECRET`, `JWT_EXPIRATION_MS`: Configuración para `docker-compose.yml` y el backend Spring Boot.
-* `GEMINI_API_KEY`: Declarada en `.env.example`, aunque actualmente la inferencia de análisis IA es determinista por reglas (ver sección 5).
+* `GEMINI_API_KEY`: Opcional; habilita inferencia multimodal real con `@google/genai` (`gemini-2.5-flash`) en `src/services/geminiAiService.ts`. Sin clave configurada, el servidor degrada automáticamente al clasificador determinista local.
 
 ### Instalación, Ejecución y Pruebas
 
@@ -109,7 +109,7 @@ Al revisar el proyecto completo se detectaron los siguientes puntos que conviene
 
 1. **Desacople entre Frontend y APIs:** `AppContext.tsx` no consume ni `src/server/apiApp.ts` ni el backend Spring Boot; toda la UI trabaja sobre `localStorage`. Si se desea conectar la UI a la API real, será necesario reemplazar las mutaciones locales de `AppContext.tsx` por llamadas `fetch()`.
 2. **Diferencia de contratos entre `apiApp.ts` y Spring Boot (`backend/`):** Ambos implementan el dominio pero con rutas y payloads distintos (por ejemplo, `apiApp.ts` expone `/api/admin/usuarios` y `/api/auth/recovery/send-code`, mientras Spring Boot expone `/api/usuarios` y `/api/auth/password-reset/request`).
-3. **`GEMINI_API_KEY` y `@google/genai` sin uso en código:** Aunque `@google/genai` figura en `package.json` y `GEMINI_API_KEY` en `.env.example`, ningún archivo en `src/` ni en `backend/` invoca la API de Gemini. Tanto `generarInferenciaAnalisisIa()` en `src/services/domainRules.ts` como `SolicitudService.java` ejecutan clasificación determinista por palabras clave.
+3. **Análisis IA en backend Java (`backend/`):** El servicio Node (`src/services/geminiAiService.ts`) ya integra `@google/genai` (`gemini-2.5-flash`) con fallback local, mientras que `SolicitudService.java` en Spring Boot mantiene inferencia determinista por palabras clave.
 4. **Motor de base de datos en `docs/SRS.md`:** La sección 3.1.3 de `docs/SRS.md` menciona `MySQL versión 8.4 LTS`, pero toda la implementación (`docker-compose.yml`, `backend/pom.xml`, `backend/sql/schema-postgresql.sql` y `application.yml`) utiliza **PostgreSQL 16** (y H2 en el perfil `test`).
 5. **Archivos sin uso aparente:**
    * `public/assets/aistudio/` (`DESIGN_108d1fc9.md`, `PLAN_3f23d407.md`, `PRD_646e0193.md`, `TRD_14ce0cc8.md`, `User-Flow_6171f652.md`, `theme_95eb8a8d.css`) no está referenciado en `src/` ni en `index.html`.
