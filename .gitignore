@@ -1,6 +1,8 @@
 node_modules/
 build/
 dist/
+server.cjs
+server.mjs
 coverage/
 .DS_Store
 *.log
