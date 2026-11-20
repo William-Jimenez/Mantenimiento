@@ -9,7 +9,7 @@ Este documento detalla paso a paso el proceso para instalar, configurar y levant
 * **Frontend:** TypeScript / JavaScript (ES Modules), React 19, Vite 8, Tailwind CSS v4
 * **Backend Spring Boot (`/backend`):** Java 21, Spring Boot 3.4, Spring Data JPA (Hibernate), Spring Security + JWT (Bearer Token) + BCrypt
 * **Base de Datos Relacional:** PostgreSQL 16 (`docker-compose.yml` y `backend/sql/schema-postgresql.sql`)
-* **Pruebas de API:** Colección y entorno Postman (`postman/`) y Suite QA con Jules (`tests/rbac.test.ts`)
+* **Pruebas de API y Contrato Técnico:** Contrato formal de Endpoints REST ([docs/documentacion_endpoints.md](docs/documentacion_endpoints.md)), Colección y entorno Postman (`postman/`) y Suite QA con Jules (`tests/rbac.test.ts`)
 * **Librerías adicionales:** Motion (animaciones), Lucide React (iconos), Google GenAI SDK
 
 ---

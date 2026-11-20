@@ -369,6 +369,7 @@ stateDiagram-v2
 #### 3.1.4 Interfaces de Comunicación
 - Protocolo seguro HTTPS mediante puerto TCP 443 con certificado TLS válido.
 - Formato de comunicación e intercambio de datos: RESTful JSON (`application/json`) con apego al estándar RFC 9457 para descriptores de error.
+- Especificación formal y contrato de integración de endpoints: Ver [docs/documentacion_endpoints.md](documentacion_endpoints.md).
 
 ---
 
