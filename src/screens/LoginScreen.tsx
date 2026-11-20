@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, UserPlus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { ConstellationCanvas, LogoLockup } from '../components/ConstellationCanvas';
+import { LogoLockup } from '../components/ConstellationCanvas';
 import { FieldError, FieldLabel, inputBaseClass, OutlineButton, PrimaryButton } from '../components/CommonUI';
 import { ThemeLanguageControls } from '../components/ThemeLanguageControls';
 import { ServiceScrollNarrative } from '../components/ServiceScrollNarrative';
 import { CampoRegistro, validarDatosRegistro } from '../services/domainRules';
+
+const HeroModel3D = lazy(() => import('../components/HeroModel3D'));
 
 export function LoginScreen() {
   const { pathname, navigate, login, registrarCuenta, loginNotice, clearLoginNotice, resetDemoData } = useApp();
@@ -729,9 +731,20 @@ export function LoginScreen() {
               </details>
             </div>
 
-            {/* Right column: Dispersed 3D maintenance & geometric field */}
-            <div className="hidden lg:block lg:col-span-6 h-[520px] xl:h-[560px] relative">
-              <ConstellationCanvas mode="constellation" className="w-full h-full" />
+            {/* Right column: Featured interactive 3D maintenance core model */}
+            <div className="lg:col-span-6 h-[300px] sm:h-[380px] lg:h-[520px] xl:h-[560px] relative">
+              <Suspense
+                fallback={
+                  <div
+                    aria-hidden="true"
+                    className="w-full h-full flex items-center justify-center rounded-[24px] border border-white/8 bg-white/[0.015]"
+                  >
+                    <div className="w-16 h-16 rounded-full border border-electric-iris/40 animate-pulse" />
+                  </div>
+                }
+              >
+                <HeroModel3D className="w-full h-full" />
+              </Suspense>
             </div>
           </div>
         </div>
