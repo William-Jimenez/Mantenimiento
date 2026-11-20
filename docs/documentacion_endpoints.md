@@ -1,550 +1,271 @@
 # Contrato Técnico y Documentación de Endpoints de la API REST
 
 **Proyecto:** Plataforma de Gestión de Solicitudes de Mantenimiento  
-**Versión de la API:** 1.0  
-**Protocolo:** HTTP/1.1 - RESTful  
 **Formato de Intercambio:** `application/json`  
-**Convención de Autenticación:** `Authorization: Bearer <JWT_TOKEN>`  
-**Base URL Local (Spring Boot):** `http://localhost:8080/api`  
-**Base URL Local (Frontend/Mock):** `http://localhost:3000/api`
+**Autenticación:** `Authorization: Bearer <TOKEN>`
+
+> [!IMPORTANT]
+> Este proyecto cuenta con **dos implementaciones de API REST** independientes:
+> 1. **Backend Spring Boot (`backend/`, puerto `8080`):** API de producción con JWT real, BCrypt y PostgreSQL 16 (documentada como contrato principal a continuación y probada en `postman/`).
+> 2. **API Express en memoria (`src/server/apiApp.ts`, puerto `3000`):** Middleware de desarrollo/pruebas usado por Vite y `tests/rbac.test.ts`. Sus diferencias de rutas se resumen en la [Sección 6](#6-diferencias-con-el-servidor-express-en-memoria-srcserverapiappts).
 
 ---
 
-## Estándar de Respuestas y Formato de Errores
+## Estándar de Respuestas de Error (Spring Boot)
 
-### Estructura Canónica de Error
-Todos los errores de la API devuelven una estructura estandarizada con código de estado HTTP correspondiente:
+El manejador global `GlobalExceptionHandler.java` devuelve siempre la siguiente estructura JSON:
 
 ```json
 {
-  "timestamp": "2026-11-20T12:00:00",
+  "timestamp": "2026-11-20T12:00:00.123456",
   "status": 400,
-  "error": "Bad Request",
-  "mensaje": "Descripción detallada del motivo del fallo o validación no cumplida",
-  "path": "/api/solicitudes"
+  "error": "Descripción detallada del error o validaciones fallidas"
 }
 ```
 
-### Tabla de Códigos de Estado HTTP
-| Código | Estado | Significado y Causa |
+| Código HTTP | Significado | Causa habitual |
 | :--- | :--- | :--- |
-| **`200 OK`** | Operación exitosa | La solicitud fue procesada correctamente y se devuelve la carga útil. |
-| **`201 Created`** | Recurso creado | Registro, creación de solicitud, recurso o evidencia completado. |
-| **`400 Bad Request`** | Parámetros inválidos | Validación de campos obligatorios, contraseñas débiles o sintaxis JSON errónea. |
-| **`401 Unauthorized`** | No autenticado | Token ausente, inválido o expirado. |
-| **`403 Forbidden`** | Acceso denegado | Usuario autenticado pero sin rol suficiente (ej. Cliente intentando acceder a ruta de Administrador). |
-| **`404 Not Found`** | No encontrado | El recurso solicitado (ID de solicitud, usuario o equipo) no existe. |
-| **`409 Conflict`** | Conflicto de estado | Duplicidad de clave única (correo, documento, código de activo) o estado incompatible. |
-| **`500 Internal Server Error`** | Error de servidor | Excepción no controlada en el backend. |
+| **`200 OK`** | Operación exitosa | Consulta, actualización o cambio de estado procesado. |
+| **`201 Created`** | Recurso creado | Registro de usuario, creación de solicitud, recurso, evidencia o análisis IA. |
+| **`400 Bad Request`** | Datos inválidos | Validaciones `@Valid` incumplidas, transición de estado inválida o archivo rechazado. |
+| **`401 Unauthorized`** | No autenticado | Token JWT ausente, inválido o credenciales erróneas. |
+| **`403 Forbidden`** | Acceso denegado | Rol sin permisos para la ruta o solicitud ajena (`CLIENTE` / `EMPLEADO` no asignado). |
+| **`404 Not Found`** | No encontrado | ID de solicitud, recurso, usuario o evidencia inexistente. |
+| **`409 Conflict`** | Conflicto | Correo, documento o código de recurso duplicado. |
+| **`500 Internal Server Error`** | Error interno | Excepción no controlada en el servidor. |
 
 ---
 
-## 1. Módulo de Autenticación y Cuentas (`/api/auth`)
+## 1. Autenticación y Perfil (`/api/auth`)
 
----
+### 1.1 Iniciar Sesión
+* **Método y URL:** `POST /api/auth/login`
+* **Autenticación:** Pública.
+* **Body (`LoginRequest`):**
+  * `correo` (`string`, obligatorio, formato email)
+  * `password` (`string`, obligatorio)
 
-### 1.1 Iniciar Sesión (Login)
-* **Propósito:** Autentica a un usuario y genera su token JWT de sesión.
-* **Método HTTP:** `POST`
-* **URL:** `/api/auth/login`
-* **Requisitos de Autenticación:** Ninguno (Público).
-* **Cabeceras:** `Content-Type: application/json`
-
-#### Parámetros de Entrada (Body JSON)
-| Campo | Tipo | Obligatorio | Descripción / Regla |
-| :--- | :--- | :---: | :--- |
-| `correo` | `string` | Sí | Correo corporativo del usuario (`admin@mantenimiento.com`). |
-| `password` | `string` | Sí | Contraseña en texto claro para cotejo con hash BCrypt. |
-
-*Ejemplo de Petición:*
+*Ejemplo de petición:*
 ```json
 {
   "correo": "admin@mantenimiento.com",
-  "password": "Password123!"
+  "password": "Admin123!"
 }
 ```
 
-#### Respuestas Exitosas (`200 OK`)
+*Respuesta exitosa (`200 OK`, `AuthResponse`):*
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkBtYW50ZW5pbWllbnRvLmNvbSIsImlkIjoxLCJyb2wiOiJBRE1JTklTVFJBRE9SIiwiZXhwIjoxNzk1MTg4ODAwfQ...",
-  "tipo": "Bearer",
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "tokenType": "Bearer",
   "usuario": {
-    "id": 1,
+    "usuarioId": 1,
+    "empleadoId": 1,
     "documento": "10000001",
-    "nombres": "Carlos",
-    "apellidos": "Administrador",
+    "nombreCompleto": "Carlos Administrador",
     "correo": "admin@mantenimiento.com",
     "cargo": "Jefe de Mantenimiento",
     "perfil": "ADMINISTRADOR",
-    "activo": true,
-    "debeCambiarPassword": false
+    "esTecnico": false,
+    "activo": true
   }
 }
 ```
 
-#### Códigos de Error
-* **`400 Bad Request`**: Parámetros faltantes o mal formados.
-* **`401 Unauthorized`**: Credenciales inválidas (usuario o contraseña incorrectos).
-```json
-{
-  "timestamp": "2026-11-20T12:00:05",
-  "status": 401,
-  "error": "Unauthorized",
-  "mensaje": "Credenciales inválidas",
-  "path": "/api/auth/login"
-}
-```
+*Errores:* `400 Bad Request` (campos inválidos), `401 Unauthorized` (`"Credenciales inválidas: correo o contraseña incorrectos"`).
 
 ---
 
-### 1.2 Registro de Clientes (Autorregistro)
-* **Propósito:** Permite el registro de nuevos usuarios clientes con rol `CLIENTE`.
-* **Método HTTP:** `POST`
-* **URL:** `/api/auth/register`
-* **Requisitos de Autenticación:** Ninguno (Público).
-* **Cabeceras:** `Content-Type: application/json`
-
-#### Parámetros de Entrada (Body JSON)
-| Campo | Tipo | Obligatorio | Descripción / Regla |
-| :--- | :--- | :---: | :--- |
-| `documento` | `string` | Sí | Documento de identidad único. |
-| `nombres` | `string` | Sí | Nombres del usuario solicitante. |
-| `apellidos` | `string` | Sí | Apellidos del usuario solicitante. |
-| `correo` | `string` | Sí | Correo electrónico con formato válido. |
-| `password` | `string` | Sí | Mínimo 8 caracteres, al menos 1 mayúscula, 1 minúscula y 1 número. |
-| `cargo` | `string` | No | Cargo o dependencia institucional (por defecto "Cliente / Solicitante"). |
-
-*Ejemplo de Petición:*
-```json
-{
-  "documento": "1098765432",
-  "nombres": "Ana",
-  "apellidos": "López",
-  "correo": "ana.lopez@empresa.com",
-  "password": "Password2026!",
-  "cargo": "Supervisora de Operaciones"
-}
-```
-
-#### Respuestas Exitosas (`201 Created`)
-Devuelve el token JWT generado automáticamente para iniciar sesión directa:
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "tipo": "Bearer",
-  "usuario": {
-    "id": 14,
-    "documento": "1098765432",
-    "nombres": "Ana",
-    "apellidos": "López",
-    "correo": "ana.lopez@empresa.com",
-    "cargo": "Supervisora de Operaciones",
-    "perfil": "CLIENTE",
-    "activo": true,
-    "debeCambiarPassword": false
-  }
-}
-```
-
-#### Códigos de Error
-* **`400 Bad Request`**: Contraseña insegura o campos obligatorios vacíos.
-* **`409 Conflict`**: Correo o documento ya registrado previamente.
-```json
-{
-  "timestamp": "2026-11-20T12:01:00",
-  "status": 409,
-  "error": "Conflict",
-  "mensaje": "El correo electrónico ya está registrado",
-  "path": "/api/auth/register"
-}
-```
+### 1.2 Autorregistro de Cliente
+* **Método y URL:** `POST /api/auth/register`
+* **Autenticación:** Pública. Asigna perfil `CLIENTE`.
+* **Body (`RegisterRequest`):** `documento` (`5-20` chars), `nombres`, `apellidos`, `correo`, `cargo` (opcional), `password` (mín. 8 chars, política de seguridad).
+* **Respuesta exitosa (`201 Created`):** Misma estructura `AuthResponse` que `1.1`.
+* **Errores:** `400 Bad Request` (política de contraseña o campos vacíos), `409 Conflict` (correo o documento ya registrado).
 
 ---
 
-### 1.3 Consultar Perfil Actual
-* **Propósito:** Retorna la información del usuario autenticado a partir de su Bearer Token.
-* **Método HTTP:** `GET`
-* **URL:** `/api/auth/me`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Roles: `ADMINISTRADOR`, `EMPLEADO`, `CLIENTE`).
+### 1.3 Recuperación de Contraseña (2 Pasos)
+* **Paso 1 — Solicitar código:** `POST /api/auth/password-reset/request` (Público)
+  * **Body (`PasswordResetRequest`):** `{ "correo": "usuario@empresa.com" }`
+  * **Respuesta (`200 OK`):** JSON con confirmación de envío/código generado en entorno local.
+* **Paso 2 — Confirmar cambio:** `POST /api/auth/password-reset/confirm` (Público)
+  * **Body (`PasswordResetConfirmRequest`):** `{ "correo": "...", "codigo": "123456", "nuevaPassword": "..." }`
+  * **Respuesta (`200 OK`):** Confirmación de actualización.
+  * **Errores:** `400 Bad Request` (código inválido/expirado o contraseña débil).
 
-#### Respuestas Exitosas (`200 OK`)
+---
+
+### 1.4 Perfil Actual
+* **Método y URL:** `GET /api/auth/me`
+* **Autenticación:** `Bearer <TOKEN>` (Cualquier rol autenticado).
+* **Respuesta (`200 OK`):** Objeto `UserProfileDto` (ver campo `usuario` en `1.1`).
+* **Errores:** `401 Unauthorized`.
+
+---
+
+## 2. Solicitudes de Mantenimiento (`/api/solicitudes`)
+
+Los estados canónicos inicializados por `DataInitializer.java` son: `Pendiente`, `Asignada`, `En proceso`, `Finalizada` (final), `Cancelada` (final) y `Rechazada` (final).
+
+### 2.1 Listar Solicitudes
+* **Método y URL:** `GET /api/solicitudes`
+* **Autenticación:** `Bearer <TOKEN>` (`ADMINISTRADOR`: todas; `EMPLEADO`: solo asignadas; `CLIENTE`: solo propias).
+* **Respuesta (`200 OK`):** Arreglo de `SolicitudResponse`.
+
+### 2.2 Consultar Solicitud por ID
+* **Método y URL:** `GET /api/solicitudes/{id}`
+* **Autenticación:** `Bearer <TOKEN>` (`ADMINISTRADOR`, `EMPLEADO` asignado o `CLIENTE` propietario).
+* **Respuesta (`200 OK`, `SolicitudResponse`):**
 ```json
 {
   "id": 1,
-  "documento": "10000001",
-  "nombres": "Carlos",
-  "apellidos": "Administrador",
-  "correo": "admin@mantenimiento.com",
-  "cargo": "Jefe de Mantenimiento",
-  "perfil": "ADMINISTRADOR",
-  "activo": true,
-  "debeCambiarPassword": false
+  "codigo": "SOL-2026-0001",
+  "solicitanteId": 3,
+  "solicitanteNombre": "Laura Martínez",
+  "solicitanteCorreo": "laura@empresa.com",
+  "registradaPorUsuarioId": 3,
+  "registradaPorNombre": "Laura Martínez",
+  "recursoId": 1,
+  "recursoCodigo": "EQ-TI-0014",
+  "recursoNombre": "Servidor Rack Principal Dell PowerEdge R750",
+  "recursoUbicacion": "Centro de Datos - Piso 3",
+  "descripcion": "Alarma acústica intermitente en fuente redundante y aumento de temperatura.",
+  "estado": "Pendiente",
+  "estadoEsFinal": false,
+  "categoria": "Informática/Electrónica",
+  "prioridad": "Alta",
+  "trabajoRealizado": null,
+  "trabajoActualizadoEn": null,
+  "motivoCierre": null,
+  "asignacionVigente": null,
+  "creadaEn": "2026-11-20T09:00:00",
+  "actualizadaEn": "2026-11-20T09:00:00",
+  "cerradaEn": null,
+  "version": 1,
+  "historial": []
 }
 ```
-
-#### Códigos de Error
-* **`401 Unauthorized`**: Token ausente o caducado.
+* **Errores:** `403 Forbidden`, `404 Not Found`.
 
 ---
 
-## 2. Módulo de Solicitudes de Mantenimiento (`/api/solicitudes`)
+### 2.3 Crear Solicitud
+* **Método y URL:** `POST /api/solicitudes`
+* **Autenticación:** `Bearer <TOKEN>` (`ADMINISTRADOR` o `CLIENTE`; bloqueado para `EMPLEADO` técnico).
+* **Body (`CreateSolicitudRequest`):**
+  * `recursoId` (`number`, obligatorio)
+  * `descripcion` (`string`, obligatorio, entre `20` y `2000` caracteres)
+  * `solicitanteId` (`number`, opcional; útil cuando el administrador registra a nombre de otro empleado)
+  * `categoriaId` (`number`, opcional)
+  * `prioridadId` (`number`, opcional)
 
----
-
-### 2.1 Listar Solicitudes
-* **Propósito:** Recupera el listado de solicitudes según el rol del usuario autenticado:
-  * `ADMINISTRADOR`: Retorna todas las solicitudes del sistema con información completa.
-  * `EMPLEADO`: Retorna únicamente las solicitudes asignadas al técnico.
-  * `CLIENTE`: Retorna únicamente las solicitudes creadas por el cliente sin datos de empleados ni terceros.
-* **Método HTTP:** `GET`
-* **URL:** `/api/solicitudes`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Roles: `ADMINISTRADOR`, `EMPLEADO`, `CLIENTE`).
-
-#### Respuestas Exitosas (`200 OK`)
-```json
-[
-  {
-    "id": 1,
-    "codigo": "SOL-2026-001",
-    "titulo": "Fuga de refrigerante en Chiller Principal",
-    "descripcion": "Se detectó goteo continuo de refrigerante R-410A en la unidad exterior del edificio B.",
-    "estadoId": 1,
-    "estadoCodigo": "REGISTRADA",
-    "estadoNombre": "Registrada",
-    "categoriaId": 1,
-    "categoriaNombre": "Climatización y HVAC",
-    "prioridadId": 4,
-    "prioridadNombre": "Urgente",
-    "recursoId": 1,
-    "recursoCodigo": "HVAC-01",
-    "recursoNombre": "Chiller Central Edificio B",
-    "ubicacion": "Azotea Edificio B",
-    "solicitanteId": 10,
-    "solicitanteNombre": "Laura Martínez",
-    "solicitanteCorreo": "laura.martinez@empresa.com",
-    "tecnicoAsignadoId": 2,
-    "tecnicoAsignadoNombre": "Pedro Gómez",
-    "fechaCreacion": "2026-11-18T09:30:00",
-    "fechaActualizacion": "2026-11-18T10:15:00",
-    "totalEvidencias": 2
-  }
-]
-```
-
-#### Códigos de Error
-* **`401 Unauthorized`**: Falta cabecera de autenticación.
-
----
-
-### 2.2 Consultar Solicitud por ID
-* **Propósito:** Retorna el detalle completo de una solicitud específica.
-* **Método HTTP:** `GET`
-* **URL:** `/api/solicitudes/{id}`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Roles: `ADMINISTRADOR`, `EMPLEADO` [si está asignada], `CLIENTE` [si es propia]).
-* **Parámetros de Ruta:** `id` (entero, identificador numérico de la solicitud).
-
-#### Respuestas Exitosas (`200 OK`)
-Retorna el objeto JSON detallado de la solicitud (similar a `2.1`).
-
-#### Códigos de Error
-* **`403 Forbidden`**: Si un `CLIENTE` intenta consultar una solicitud ajena o un `EMPLEADO` una no asignada.
-* **`404 Not Found`**: Solicitud inexistente.
+*Ejemplo de petición:*
 ```json
 {
-  "timestamp": "2026-11-20T12:02:15",
-  "status": 404,
-  "error": "Not Found",
-  "mensaje": "Solicitud con ID 999 no encontrada",
-  "path": "/api/solicitudes/999"
+  "recursoId": 1,
+  "descripcion": "El servidor principal presenta ruido en ventilador frontal y alerta de temperatura.",
+  "categoriaId": 5,
+  "prioridadId": 3
 }
 ```
+* **Respuesta (`201 Created`):** `SolicitudResponse` con estado inicial `"Pendiente"`.
+* **Errores:** `400 Bad Request` (descripción < 20 caracteres o recurso inexistente), `403 Forbidden`.
 
 ---
 
-### 2.3 Crear Solicitud de Mantenimiento
-* **Propósito:** Registra una nueva solicitud de mantenimiento preventivo o correctivo.
-* **Método HTTP:** `POST`
-* **URL:** `/api/solicitudes`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Roles: `ADMINISTRADOR`, `CLIENTE`).
-* **Cabeceras:** `Content-Type: application/json`
-
-#### Parámetros de Entrada (Body JSON)
-| Campo | Tipo | Obligatorio | Descripción / Regla |
-| :--- | :--- | :---: | :--- |
-| `titulo` | `string` | Sí | Título conciso del incidente (mínimo 5 caracteres). |
-| `descripcion` | `string` | Sí | Detalle técnico del daño observado. |
-| `categoriaId` | `number` | Sí | ID de la categoría técnica (`1` a `5`). |
-| `prioridadId` | `number` | Sí | ID de prioridad (`1`=Baja, `2`=Media, `3`=Alta, `4`=Urgente). |
-| `recursoId` | `number` | Sí | ID del activo físico reportado. |
-| `ubicacion` | `string` | Sí | Ubicación física exacta de la falla. |
-
-*Ejemplo de Petición:*
-```json
-{
-  "titulo": "Fallo en motor de elevador de carga 02",
-  "descripcion": "El motor presenta vibración anómala y sobrecalentamiento durante el ascenso.",
-  "categoriaId": 2,
-  "prioridadId": 3,
-  "recursoId": 4,
-  "ubicacion": "Nivel 1 - Cuarto de Máquinas Oriente"
-}
-```
-
-#### Respuestas Exitosas (`201 Created`)
-Devuelve la solicitud creada con estado inicial `REGISTRADA` y código correlativo asignado:
-```json
-{
-  "id": 15,
-  "codigo": "SOL-2026-015",
-  "titulo": "Fallo en motor de elevador de carga 02",
-  "descripcion": "El motor presenta vibración anómala y sobrecalentamiento durante el ascenso.",
-  "estadoCodigo": "REGISTRADA",
-  "estadoNombre": "Registrada",
-  "fechaCreacion": "2026-11-20T12:03:00"
-}
-```
-
-#### Códigos de Error
-* **`400 Bad Request`**: Datos incompletos o IDs de categoría/recurso inexistentes.
-* **`403 Forbidden`**: Si un usuario con rol `EMPLEADO` intenta crear solicitudes.
+### 2.4 Actualizar Solicitud
+* **Método y URL:** `PUT /api/solicitudes/{id}`
+* **Autenticación:** `Bearer <TOKEN>` (`ADMINISTRADOR`, `EMPLEADO` asignado o `CLIENTE` propietario según estado).
+* **Body (`UpdateSolicitudRequest`):** `recursoId`, `descripcion` (`20-2000` chars), `categoriaId`, `prioridadId`, `trabajoRealizado` (todos opcionales).
+* **Respuesta (`200 OK`):** `SolicitudResponse` actualizada.
+* **Errores:** `400 Bad Request`, `403 Forbidden`, `404 Not Found`.
 
 ---
 
-### 2.4 Asignar Técnico a Solicitud
-* **Propósito:** Asigna un técnico responsable a una solicitud y realiza la transición de estado a `ASIGNADA`.
-* **Método HTTP:** `PATCH`
-* **URL:** `/api/solicitudes/{id}/asignar`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Exclusivo rol: `ADMINISTRADOR`).
-* **Parámetros de Entrada (Body JSON):**
-  * `empleadoId` (number, obligatorio): Identificador del empleado técnico asignado.
-  * `notas` (string, opcional): Instrucciones técnicas de asignación.
-
-*Ejemplo de Petición:*
-```json
-{
-  "empleadoId": 2,
-  "notas": "Priorizar revisión del sensor térmico y verificar lubricación de rodamientos."
-}
-```
-
-#### Respuestas Exitosas (`200 OK`)
-Retorna la solicitud con el nuevo técnico y estado `ASIGNADA`.
-
-#### Códigos de Error
-* **`403 Forbidden`**: Si lo intenta un usuario no administrador.
-* **`404 Not Found`**: Si la solicitud o el empleado técnico no existen.
+### 2.5 Asignar Técnico
+* **Método y URL:** `PATCH /api/solicitudes/{id}/asignar`
+* **Autenticación:** `Bearer <TOKEN>` (Exclusivo `ADMINISTRADOR`).
+* **Body (`AsignarTecnicoRequest`):**
+  * `tecnicoId` (`number`, obligatorio)
+  * `categoriaId` (`number`, opcional)
+  * `prioridadId` (`number`, opcional)
+  * `motivoReasignacion` (`string`, opcional)
+* **Respuesta (`200 OK`):** `SolicitudResponse` con estado `"Asignada"` y `asignacionVigente` poblada.
+* **Errores:** `403 Forbidden`, `404 Not Found`.
 
 ---
 
-### 2.5 Actualizar Estado de Solicitud
-* **Propósito:** Hace avanzar la solicitud por la máquina de estados (`EN_PROCESO`, `ATENDIDA`, `FINALIZADA`, `CANCELADA`).
-* **Método HTTP:** `PATCH`
-* **URL:** `/api/solicitudes/{id}/estado`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Roles: `ADMINISTRADOR` o `EMPLEADO` asignado a la solicitud).
-
-#### Parámetros de Entrada (Body JSON)
-| Campo | Tipo | Obligatorio | Descripción |
-| :--- | :--- | :---: | :--- |
-| `nuevoEstadoCodigo` | `string` | Sí | Código de estado objetivo (`EN_PROCESO`, `FINALIZADA`, etc.). |
-| `motivo` | `string` | Sí | Justificación del cambio de estado o bitácora de trabajo realizado. |
-
-*Ejemplo de Petición:*
-```json
-{
-  "nuevoEstadoCodigo": "EN_PROCESO",
-  "motivo": "Se inicia diagnóstico en sitio con multímetro y cámara termográfica."
-}
-```
-
-#### Respuestas Exitosas (`200 OK`)
-Retorna la solicitud con su nuevo estado y la entrada registrada en el historial.
-
-#### Códigos de Error
-* **`400 Bad Request`**: Transición de estado inválida según la máquina de estados.
-* **`403 Forbidden`**: Si un empleado no asignado o un cliente intenta cambiar el estado.
+### 2.6 Cambiar Estado
+* **Método y URL:** `PATCH /api/solicitudes/{id}/estado`
+* **Autenticación:** `Bearer <TOKEN>` (`ADMINISTRADOR` o `EMPLEADO` asignado; `CLIENTE` solo puede cancelar si aplica regla de negocio).
+* **Body (`CambiarEstadoRequest`):**
+  * `nuevoEstado` (`string`, obligatorio: `"Pendiente"`, `"Asignada"`, `"En proceso"`, `"Finalizada"`, `"Cancelada"`, `"Rechazada"`)
+  * `motivo` (`string`, opcional/requerido en cierre o rechazo)
+  * `trabajoRealizado` (`string`, opcional)
+* **Respuesta (`200 OK`):** `SolicitudResponse` actualizada.
+* **Errores:** `400 Bad Request` (transición inválida), `403 Forbidden`.
 
 ---
 
-### 2.6 Adjuntar Evidencia Fotográfica o Documental
-* **Propósito:** Sube una evidencia (JPEG, PNG, WebP o PDF) vinculada a la solicitud.
-* **Método HTTP:** `POST`
-* **URL:** `/api/solicitudes/{id}/evidencias`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Roles: `ADMINISTRADOR`, `EMPLEADO` asignado, o `CLIENTE` propietario).
-
-#### Parámetros de Entrada (Body JSON / Multipart)
-| Campo | Tipo | Obligatorio | Descripción |
-| :--- | :--- | :---: | :--- |
-| `nombreArchivo` | `string` | Sí | Nombre del archivo con extensión válida. |
-| `tipo` | `string` | Sí | Tipo MIME (`image/jpeg`, `image/png`, `application/pdf`). |
-| `tamanoBytes` | `number` | Sí | Tamaño en bytes (límite máximo: 10 MB). |
-| `contenidoBase64`| `string` | Sí | Contenido codificado en Base64 con encabezado data URI. |
-
-#### Respuestas Exitosas (`201 Created`)
-```json
-{
-  "id": 8,
-  "solicitudId": 1,
-  "nombreArchivo": "termografia_motor.jpg",
-  "tipo": "IMAGEN",
-  "tamanoBytes": 245100,
-  "fechaCarga": "2026-11-20T12:05:00"
-}
-```
-
-#### Códigos de Error
-* **`400 Bad Request`**: Extensión no permitida, archivo supera 10 MB o firma binaria inválida.
+### 2.7 Eliminar Solicitud y Consultar Historial
+* `DELETE /api/solicitudes/{id}` — **Respuesta (`200 OK`):** `{ "mensaje": "Solicitud eliminada correctamente" }`.
+* `GET /api/solicitudes/{id}/historial` — **Respuesta (`200 OK`):** Arreglo de `HistorialEstadoDto`.
 
 ---
 
-## 3. Módulo de Recursos y Activos (`/api/recursos`)
+### 2.8 Evidencias y Análisis de IA
+* **Adjuntar evidencia:** `POST /api/solicitudes/{id}/evidencias`
+  * **Body (`UploadEvidenciaRequest`):** `nombreOriginal` (`string`), `dataUrl` (`string`, Base64 con cabecera Data URI), `tamanoBytes` (`number`).
+  * **Respuesta (`201 Created`):** `EvidenciaDto`.
+* **Descargar evidencia:** `GET /api/solicitudes/{id}/evidencias/{evidenciaId}/descargar`
+  * **Respuesta (`200 OK`):** JSON con metadatos y `dataUrl`.
+* **Listar análisis IA:** `GET /api/solicitudes/{id}/analisis-ia` (`200 OK`, arreglo `AnalisisIADto`).
+* **Disparar análisis IA:** `POST /api/solicitudes/{id}/analisis-ia` (Exclusivo `ADMINISTRADOR`; body opcional `TriggerAnalisisIARequest`; devuelve `201 Created`).
+* **Revisar análisis IA:** `POST /api/solicitudes/{id}/analisis-ia/{analisisId}/revisar` (Exclusivo `ADMINISTRADOR`; body `RevisarAnalisisIARequest` con `decision`: `"ACEPTADO"`, `"MODIFICADO"` o `"DESCARTADO"`, `categoriaId`, `prioridadId`).
 
 ---
 
-### 3.1 Listar Recursos
-* **Propósito:** Consulta el inventario de activos físicos registrados.
-* **Método HTTP:** `GET`
-* **URL:** `/api/recursos`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Roles: `ADMINISTRADOR`, `EMPLEADO`, `CLIENTE`).
+## 3. Recursos / Activos (`/api/recursos`)
 
-#### Respuestas Exitosas (`200 OK`)
-```json
-[
-  {
-    "id": 1,
-    "codigo": "HVAC-01",
-    "nombre": "Chiller Central Edificio B",
-    "tipoRecursoId": 1,
-    "tipoRecursoNombre": "Equipo de Climatización",
-    "ubicacion": "Azotea Edificio B",
-    "descripcion": "Unidad enfriadora de agua de 150 TR",
-    "activo": true
-  }
-]
-```
+* `GET /api/recursos` — Lista todos los recursos (`200 OK`, arreglo `RecursoResponse`).
+* `GET /api/recursos/{id}` — Detalle de un recurso (`200 OK` / `404 Not Found`).
+* `POST /api/recursos` — Crea un recurso (Exclusivo `ADMINISTRADOR`; body `CreateRecursoRequest`: `codigo`, `nombre`, `tipoRecursoId`, `ubicacion`, `descripcion`). Devuelve `201 Created` o `409 Conflict` si el código ya existe.
+* `PUT /api/recursos/{id}` — Actualiza un recurso (Exclusivo `ADMINISTRADOR`; body `UpdateRecursoRequest`: `nombre`, `tipoRecursoId`, `ubicacion`, `descripcion`, `activo`).
+* `DELETE /api/recursos/{id}` — Elimina o desactiva un recurso (Exclusivo `ADMINISTRADOR`).
 
 ---
 
-### 3.2 Crear Recurso (Activo)
-* **Propósito:** Da de alta un nuevo equipo o activo en el inventario.
-* **Método HTTP:** `POST`
-* **URL:** `/api/recursos`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Exclusivo rol: `ADMINISTRADOR`).
+## 4. Usuarios y Empleados (`/api/usuarios`, `/api/empleados`)
 
-#### Parámetros de Entrada (Body JSON)
-| Campo | Tipo | Obligatorio | Descripción |
-| :--- | :--- | :---: | :--- |
-| `codigo` | `string` | Sí | Código de placa único (ej: `"UPS-03"`). |
-| `nombre` | `string` | Sí | Nombre descriptivo del activo. |
-| `tipoRecursoId` | `number` | Sí | Identificador del tipo de recurso. |
-| `ubicacion` | `string` | Sí | Ubicación física permanente. |
-| `descripcion` | `string` | No | Especificaciones técnicas del activo. |
+Ambos controladores requieren rol **`ADMINISTRADOR`** (`@PreAuthorize("hasRole('ADMINISTRADOR')")`).
 
-*Ejemplo de Petición:*
-```json
-{
-  "codigo": "UPS-03",
-  "nombre": "Sistema de Energía Ininterrumpida Data Center",
-  "tipoRecursoId": 2,
-  "ubicacion": "Sótano 1 - Sala Eléctrica",
-  "descripcion": "UPS trifásico 40kVA con banco de baterías de litio"
-}
-```
-
-#### Respuestas Exitosas (`201 Created`)
-Retorna el recurso creado con su ID asignado.
-
-#### Códigos de Error
-* **`409 Conflict`**: Ya existe un recurso con ese código de placa.
-* **`403 Forbidden`**: Si la acción es ejecutada por `EMPLEADO` o `CLIENTE`.
+* `GET /api/usuarios` — Lista todos los usuarios (`UserProfileDto[]`).
+* `POST /api/usuarios` — Crea usuario administrativo/técnico (`CreateUsuarioRequest`: `documento`, `nombres`, `apellidos`, `correo`, `cargo`, `perfil`, `esTecnico`, `password`). El usuario nace con `debeCambiarPassword = true`. Devuelve `201 Created` o `409 Conflict`.
+* `PATCH /api/usuarios/{id}/rol` — Cambia perfil/bandera técnica (`CambiarRolRequest`: `perfil`, `esTecnico`).
+* `PATCH /api/usuarios/{id}/estado` — Activa o desactiva la cuenta.
+* `GET /api/empleados` / `POST /api/empleados` — Consulta y registro de empleados.
 
 ---
 
-## 4. Módulo de Administración de Usuarios (`/api/usuarios`)
+## 5. Salud y Catálogos (`/api`)
+
+* `GET /api/health` — Público. Devuelve `{ "status": "UP", "service": "solicitudes-mantenimiento-api", "timestamp": "..." }`.
+* `GET /api/estados`, `GET /api/categorias`, `GET /api/prioridades`, `GET /api/tipos-recurso`, `GET /api/tecnicos` — Requieren `Bearer <TOKEN>`; devuelven los catálogos paramétricos activos.
 
 ---
 
-### 4.1 Listar Usuarios
-* **Propósito:** Lista todos los usuarios registrados con su perfil y estado.
-* **Método HTTP:** `GET`
-* **URL:** `/api/usuarios`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Exclusivo rol: `ADMINISTRADOR`).
+## 6. Diferencias con el Servidor Express en Memoria (`src/server/apiApp.ts`)
 
-#### Respuestas Exitosas (`200 OK`)
-```json
-[
-  {
-    "id": 1,
-    "documento": "10000001",
-    "nombres": "Carlos",
-    "apellidos": "Administrador",
-    "correo": "admin@mantenimiento.com",
-    "cargo": "Jefe de Mantenimiento",
-    "perfil": "ADMINISTRADOR",
-    "activo": true,
-    "debeCambiarPassword": false
-  }
-]
-```
+El servidor Express usado en desarrollo (puerto `3000`) y en `tests/rbac.test.ts` implementa las mismas reglas RBAC pero utiliza convenciones de rutas propias:
 
-#### Códigos de Error
-* **`403 Forbidden`**: Si un usuario con rol `EMPLEADO` o `CLIENTE` intenta acceder.
-
----
-
-### 4.2 Crear Usuario Administrativo
-* **Propósito:** Registra un nuevo empleado o administrador en el sistema.
-* **Método HTTP:** `POST`
-* **URL:** `/api/usuarios`
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Exclusivo rol: `ADMINISTRADOR`).
-
-#### Parámetros de Entrada (Body JSON)
-| Campo | Tipo | Obligatorio | Descripción |
-| :--- | :--- | :---: | :--- |
-| `documento` | `string` | Sí | Documento de identidad único. |
-| `nombres` | `string` | Sí | Nombres del empleado. |
-| `apellidos` | `string` | Sí | Apellidos del empleado. |
-| `correo` | `string` | Sí | Correo corporativo único. |
-| `password` | `string` | Sí | Contraseña temporal que cumple política de seguridad. |
-| `cargo` | `string` | Sí | Cargo funcional (ej. "Técnico Electricista"). |
-| `perfil` | `string` | Sí | `"ADMINISTRADOR"`, `"EMPLEADO"` o `"CLIENTE"`. |
-| `esTecnico` | `boolean`| No | Indica si puede recibir órdenes de trabajo (`true`/`false`). |
-
-#### Respuestas Exitosas (`201 Created`)
-Retorna el perfil del usuario creado con `debeCambiarPassword = true` para forzar cambio en su primer inicio.
-
-#### Códigos de Error
-* **`400 Bad Request`**: Perfil inválido o contraseña no cumple requisitos de robustez.
-* **`409 Conflict`**: Correo o documento de identidad duplicado.
-
----
-
-## 5. Módulo de Salud y Catálogos (`/api/health`, `/api/estados`, etc.)
-
----
-
-### 5.1 Comprobación de Estado (Health Check)
-* **Propósito:** Monitoreo y diagnóstico de disponibilidad del servicio API.
-* **Método HTTP:** `GET`
-* **URL:** `/api/health`
-* **Requisitos de Autenticación:** Ninguno (Público).
-
-#### Respuestas Exitosas (`200 OK`)
-```json
-{
-  "status": "UP",
-  "service": "solicitudes-mantenimiento-api",
-  "timestamp": "2026-11-20T12:00:00"
-}
-```
-
----
-
-### 5.2 Catálogos Paramétricos
-* **URLs disponibles:**
-  * `GET /api/estados`: Listado de estados de la máquina de ciclo de vida (`REGISTRADA`, `ASIGNADA`, `EN_PROCESO`, `ATENDIDA`, `FINALIZADA`, `CANCELADA`).
-  * `GET /api/categorias`: Listado de categorías de activos y fallas.
-  * `GET /api/prioridades`: Niveles de criticidad (`BAJA`, `MEDIA`, `ALTA`, `URGENTE`).
-  * `GET /api/tipos-recurso`: Tipología de inventario.
-* **Requisitos de Autenticación:** `Bearer <TOKEN>` (Roles: `ADMINISTRADOR`, `EMPLEADO`, `CLIENTE`).
-* **Respuesta Exitosa:** `200 OK` con un array JSON de los objetos paramétricos correspondientes.
+| Capacidad | Spring Boot (`backend/`) | Express in-memory (`src/server/apiApp.ts`) |
+| :--- | :--- | :--- |
+| Perfil actual | `GET /api/auth/me` | `GET /api/me` |
+| Recuperación de clave | `POST /api/auth/password-reset/request` y `/confirm` | `POST /api/auth/recovery/send-code`, `/verify-code` y `/api/auth/reset-password` |
+| Gestión de usuarios | `/api/usuarios/**` | `/api/admin/usuarios/**` |
+| Gestión de empleados | `/api/empleados/**` | `/api/admin/empleados/**` |
+| Crear/editar recursos | `POST/PUT /api/recursos/**` | `POST/PUT /api/admin/recursos/**` |
+| Asignar técnico | `PATCH /api/solicitudes/{id}/asignar` | `POST /api/admin/solicitudes/:id/asignar` |
+| Bandeja y trabajo técnico | `GET /api/solicitudes`, `PATCH /api/solicitudes/{id}/estado` | `GET /api/tecnico/solicitudes`, `PATCH /api/tecnico/solicitudes/:id/trabajo` y `/estado` |
+| Análisis IA (admin) | `POST /api/solicitudes/{id}/analisis-ia` | `POST /api/admin/solicitudes/:id/analisis-ia` |
