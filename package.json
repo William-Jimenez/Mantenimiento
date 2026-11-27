@@ -15,7 +15,8 @@
     "lint": "tsc --noEmit",
     "test": "tsx --test tests/rbac.test.ts tests/integration.test.ts",
     "test:jules": "tsx scripts/jules-qa-runner.ts",
-    "test:qa": "tsx scripts/jules-qa-runner.ts"
+    "test:qa": "tsx scripts/jules-qa-runner.ts",
+    "ecc:verify": "tsx scripts/ecc-verify.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

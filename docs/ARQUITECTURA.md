@@ -96,3 +96,7 @@ Este documento describe únicamente los módulos críticos, complejos o con deci
 ### 4.3 Scripts de Despliegue IIS (`scripts/deploy-iis.ps1`, `scripts/install-url-rewrite.ps1`)
 * `deploy-iis.ps1` automatiza `npm.cmd run build`, `npm.cmd run build:server`, copia del `web.config` según `-DeploymentMode` (`ReverseProxy`, `iisnode`, `StaticSpa`, `NativeNoModules`), asignación de permisos NTFS a `IIS_IUSRS`/`IUSR` y creación del Application Pool (`MantenimientoPool`) y sitio (`MantenimientoApp`) vía `appcmd.exe`.
 * Ambos scripts evitan caracteres Unicode/emoji en literales de cadena para prevenir errores de tokenización (`TerminatorExpectedAtEndOfString`) en Windows PowerShell 5.1.
+
+### 4.4 Ecosistema ECC y Reglas para Agentes (`.agents/`, `CLAUDE.md`, `scripts/ecc-verify.ts`)
+* **Marco de Trabajo ECC (Everything Claude Code / Antigravity):** Estandariza la interacción de agentes autónomos y desarrolladores mediante reglas modulares organizadas en `.agents/rules/` (`tech-stack.md`, `code-standards.md`, `branch-workflow.md`, `testing-qa.md`) y el repositorio de instintos (`.agents/instincts/`).
+* **Verificación Unificada (`npm.cmd run ecc:verify`):** Orquestada por `scripts/ecc-verify.ts`, asegura que todas las reglas y documentación requerida estén presentes, la validación estática de tipos (`tsc --noEmit`) sea verde, y toda la suite de pruebas RBAC e integración se ejecute sin fallos antes de promover código a las ramas `qa` y `main`.

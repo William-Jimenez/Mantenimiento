@@ -19,6 +19,7 @@ El repositorio contiene **tres piezas diferenciadas** que conviene entender ante
 ## 2. Estructura del Repositorio
 
 ```text
+├── .agents/                  # Reglas del proyecto e instintos ECC (tech-stack, workflow, QA)
 ├── backend/                  # API Java 21 / Spring Boot 3.4 + PostgreSQL 16
 │   ├── sql/                  # DDL de creación e índices (schema-postgresql.sql)
 │   ├── src/main/java/.../    # Controladores, entidades JPA, seguridad JWT, servicios
@@ -27,7 +28,7 @@ El repositorio contiene **tres piezas diferenciadas** que conviene entender ante
 ├── iis/                      # Plantillas web.config para despliegue en IIS
 ├── postman/                  # Colección y entorno Postman para Spring Boot (puerto 8080)
 ├── public/assets/aistudio/   # Artefactos de diseño previos (no referenciados en runtime)
-├── scripts/                  # Scripts de QA (jules-qa-runner.ts) y despliegue IIS (.ps1)
+├── scripts/                  # Scripts de QA (jules-qa-runner.ts, ecc-verify.ts) y despliegue IIS (.ps1)
 ├── src/                      # Frontend React + servidor Express en memoria
 │   ├── components/           # Layout, componentes UI comunes y escenas 3D/Canvas
 │   ├── context/              # Estado global y persistencia (AppContext.tsx)
@@ -37,7 +38,9 @@ El repositorio contiene **tres piezas diferenciadas** que conviene entender ante
 │   ├── server/               # apiApp.ts (Express) y productionServer.ts (IIS/Node)
 │   ├── services/             # Reglas de negocio (domainRules.ts) y PBKDF2 (passwordSecurity.ts)
 │   └── types/                # Contratos TypeScript del dominio (domain.ts)
-└── tests/                    # Suite automatizada RBAC y reglas de dominio (rbac.test.ts)
+├── tests/                    # Suite automatizada RBAC y reglas de dominio (rbac.test.ts)
+├── AGENTS.md                 # Reglas mandatorias para agentes autónomos
+└── CLAUDE.md                 # Directrices de proyecto, comandos y estándares ECC
 ```
 
 ---
@@ -79,7 +82,10 @@ npm.cmd test
 # 5. Ejecutar validación QA con Jules (obligatoria en rama qa)
 npm.cmd run test:jules
 
-# 6. Compilar frontend (dist/) y servidor de producción (server.cjs / server.mjs)
+# 6. Ejecutar verificación integral de ECC (tipos, tests y consistencia documental)
+npm.cmd run ecc:verify
+
+# 7. Compilar frontend (dist/) y servidor de producción (server.cjs / server.mjs)
 npm.cmd run build
 npm.cmd run build:server
 ```
@@ -129,3 +135,5 @@ Al revisar el proyecto completo se detectaron los siguientes puntos que conviene
 | [docs/modelo_entidad_relacion.md](docs/modelo_entidad_relacion.md) | Modelo entidad-relación de la base de datos |
 | [docs/diagrama_uml.md](docs/diagrama_uml.md) | Diagramas UML de casos de uso y secuencia |
 | [AGENTS.md](AGENTS.md) | Reglas de flujo de 3 ramas, QA con Jules y mantenimiento documental |
+| [CLAUDE.md](CLAUDE.md) | Guía de proyecto, comandos y estándares de desarrollo ECC |
+| [.agents/rules/](.agents/rules/) | Reglas modulares de arquitectura, pruebas y calidad para agentes |
