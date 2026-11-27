@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Check } from 'lucide-react';
 import { SceneVariant, ServiceScene3D } from './ServiceScene3D';
+import { PrimaryButton } from './CommonUI';
 
 export interface NarrativeStep {
   id: string;
@@ -12,6 +13,7 @@ export interface NarrativeStep {
   variant: SceneVariant;
   accentHex: string;
   accentTextClass: string;
+  accentBadgeClass: string;
   hudLabel: string;
   hudMetric: string;
 }
@@ -30,8 +32,10 @@ export const SERVICE_NARRATIVE_STEPS: NarrativeStep[] = [
       'Visibilidad corporativa 24/7',
     ],
     variant: 'core-network',
-    accentHex: '#8052ff',
-    accentTextClass: 'text-electric-iris',
+    accentHex: '#3b82f6',
+    accentTextClass: 'text-[var(--brand-primary-text)]',
+    accentBadgeClass:
+      'bg-[var(--brand-primary-soft)] border-[var(--brand-primary-border)] text-[var(--brand-primary-text)]',
     hudLabel: 'NÚCLEO DE ACTIVOS · RED CONECTADA',
     hudMetric: '100% Trazabilidad de recursos',
   },
@@ -48,8 +52,10 @@ export const SERVICE_NARRATIVE_STEPS: NarrativeStep[] = [
       'Radicación inmediata en cola',
     ],
     variant: 'diagnostic-scanner',
-    accentHex: '#ffb829',
-    accentTextClass: 'text-saffron-spark',
+    accentHex: '#f59e0b',
+    accentTextClass: 'text-[var(--status-warning-text)]',
+    accentBadgeClass:
+      'bg-[var(--status-warning-soft)] border-[var(--status-warning-border)] text-[var(--status-warning-text)]',
     hudLabel: 'ESCÁNER DE DIAGNÓSTICO · RADICACIÓN',
     hudMetric: 'Registro estructurado de fallas',
   },
@@ -66,8 +72,10 @@ export const SERVICE_NARRATIVE_STEPS: NarrativeStep[] = [
       'Bitácora de intervención',
     ],
     variant: 'precision-gears',
-    accentHex: '#15846e',
-    accentTextClass: 'text-deep-verdant',
+    accentHex: '#10b981',
+    accentTextClass: 'text-[var(--status-success-text)]',
+    accentBadgeClass:
+      'bg-[var(--status-success-soft)] border-[var(--status-success-border)] text-[var(--status-success-text)]',
     hudLabel: 'SINCRONIZACIÓN · FLUJO TÉCNICO',
     hudMetric: 'Coordinación de especialistas',
   },
@@ -84,8 +92,10 @@ export const SERVICE_NARRATIVE_STEPS: NarrativeStep[] = [
       'Historial por equipo y sede',
     ],
     variant: 'shield-metrics',
-    accentHex: '#8052ff',
-    accentTextClass: 'text-electric-iris',
+    accentHex: '#6366f1',
+    accentTextClass: 'text-[var(--ai-accent-text)]',
+    accentBadgeClass:
+      'bg-[var(--ai-accent-soft)] border-[var(--ai-accent-border)] text-[var(--ai-accent-text)]',
     hudLabel: 'VERIFICACIÓN · INTEGRIDAD OPERATIVA',
     hudMetric: 'Ciclo de vida auditado',
   },
@@ -104,7 +114,7 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
   const [progressMap, setProgressMap] = useState<number[]>(() =>
     SERVICE_NARRATIVE_STEPS.map((_, idx) => (idx === 0 ? 0.35 : 0))
   );
-  const [isPaused, setIsPaused] = useState(false);
+  const [isPaused] = useState(false);
 
   useEffect(() => {
     const sections = sectionRefs.current.filter(Boolean) as HTMLElement[];
@@ -143,35 +153,33 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
             if (idx >= 0 && idx < next.length) {
               const rect = entry.boundingClientRect;
               const vh = window.innerHeight || 1;
-              // Calculate normalized scroll progression through viewport (0 -> 1)
               const rawProgress = (vh - rect.top) / (vh + rect.height);
               const clamped = Math.max(0, Math.min(1, rawProgress));
               next[idx] = clamped;
 
-                if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
-                  setActiveIndex(idx);
-                }
+              if (entry.isIntersecting && entry.intersectionRatio >= 0.2) {
+                setActiveIndex(idx);
+              }
 
-                // Fallback animation when native CSS Scroll-Driven Animations are unavailable
-                if (!supportsNativeViewTimeline && !prefersNoMotion) {
-                  const contentEl = entry.target.querySelector<HTMLElement>(
-                    '.narrative-screen-content'
-                  );
-                  const stageEl = entry.target.querySelector<HTMLElement>(
-                    '.narrative-stage-3d'
-                  );
-                  const visibility = Math.min(1, entry.intersectionRatio * 1.65);
-                  if (contentEl) {
-                    contentEl.style.opacity = `${0.18 + visibility * 0.82}`;
-                    contentEl.style.transform = `translate3d(0, ${(1 - visibility) * 28}px, 0)`;
-                  }
-                  if (stageEl) {
-                    stageEl.style.opacity = `${0.2 + visibility * 0.8}`;
-                    stageEl.style.transform = `scale(${0.92 + visibility * 0.08})`;
-                  }
+              if (!supportsNativeViewTimeline && !prefersNoMotion) {
+                const contentEl = entry.target.querySelector<HTMLElement>(
+                  '.narrative-screen-content'
+                );
+                const stageEl = entry.target.querySelector<HTMLElement>(
+                  '.narrative-stage-3d'
+                );
+                const visibility = Math.min(1, entry.intersectionRatio * 1.65);
+                if (contentEl) {
+                  contentEl.style.opacity = `${0.22 + visibility * 0.78}`;
+                  contentEl.style.transform = `translate3d(0, ${(1 - visibility) * 22}px, 0)`;
+                }
+                if (stageEl) {
+                  stageEl.style.opacity = `${0.25 + visibility * 0.75}`;
+                  stageEl.style.transform = `scale(${0.94 + visibility * 0.06})`;
                 }
               }
-            });
+            }
+          });
           return next;
         });
       },
@@ -188,10 +196,9 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
     <section
       id="servicio-narrativa"
       aria-label="Explicación interactiva del servicio de mantenimiento"
-      className="relative bg-void text-bone-white border-t border-white/12"
+      className="relative bg-[var(--bg-canvas)] text-[var(--text-primary)] border-t border-[var(--border-subtle)]"
     >
-      {/* Consecutive full-viewport narrative screens with identical visual distribution */}
-      <div className="divide-y divide-white/8">
+      <div className="divide-y divide-[var(--border-subtle)]">
         {SERVICE_NARRATIVE_STEPS.map((step, index) => {
           const stepProgress = progressMap[index] ?? 0;
           const isStepActive =
@@ -205,49 +212,58 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
               ref={(el) => {
                 sectionRefs.current[index] = el;
               }}
-              className="narrative-screen min-h-screen flex items-center px-[18px] sm:px-[30px] py-[60px] lg:py-[96px]"
+              className="narrative-screen min-h-[82vh] flex items-center px-4 sm:px-6 lg:px-8 py-16 lg:py-24"
             >
-              <div className="max-w-[1280px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-[36px] lg:gap-[48px] items-center">
-                {/* Left side: Uniform typography & narrative explanation */}
-                <div className="narrative-screen-content lg:col-span-6 space-y-[24px]">
-                  <div className="flex items-center gap-[12px]">
+              <div className="max-w-[1280px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+                {/* Left side: Structured editorial explanation */}
+                <div className="narrative-screen-content lg:col-span-6 space-y-5">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`font-mono-code text-[12px] font-semibold px-2.5 py-1 rounded-[8px] border ${step.accentBadgeClass}`}
+                    >
+                      {step.number}
+                    </span>
                     <span className={`nav-label ${step.accentTextClass}`}>
                       {step.eyebrow}
                     </span>
                   </div>
 
-                  <h2 className="text-[36px] sm:text-[48px] lg:text-[56px] leading-[1.08] tracking-[-1.68px] text-bone-white">
+                  <h2 className="text-[28px] sm:text-[36px] lg:text-[42px] leading-[1.12] tracking-[-0.025em] font-bold text-[var(--text-primary)]">
                     {step.title}
                   </h2>
 
-                  <p className="body-ultralight text-silver-mist max-w-[520px]">
+                  <p className="body-readable text-[var(--text-secondary)] max-w-[540px] text-[16px]">
                     {step.paragraph}
                   </p>
 
                   <ul
                     aria-label={`Puntos clave de ${step.eyebrow}`}
-                    className="pt-[6px] flex flex-wrap gap-[10px]"
+                    className="pt-2 flex flex-wrap gap-2.5 list-none p-0"
                   >
                     {step.highlights.map((item) => (
                       <li
                         key={item}
-                        className="px-[14px] py-[6px] rounded-full border border-white/12 bg-white/[0.03] text-[13px] text-ash-gray"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[9px] border border-[var(--border-default)] bg-[var(--bg-surface)] text-[13px] font-medium text-[var(--text-secondary)]"
                       >
-                        {item}
+                        <Check
+                          className={`w-3.5 h-3.5 shrink-0 ${step.accentTextClass}`}
+                          aria-hidden="true"
+                        />
+                        <span>{item}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
 
-                {/* Right side: Uniform 3D interactive canvas stage */}
+                {/* Right side: Precision 3D interactive telemetry stage */}
                 <div className="narrative-stage-3d lg:col-span-6">
-                  <div className="relative h-[300px] sm:h-[360px] lg:h-[440px] w-full rounded-[24px] border border-white/12 bg-white/[0.02] overflow-hidden flex flex-col justify-between p-[18px] sm:p-[24px]">
+                  <div className="surface-card technical-grid-bg relative h-[300px] sm:h-[360px] lg:h-[430px] w-full overflow-hidden flex flex-col justify-between p-4 sm:p-5">
                     {/* Top HUD metadata */}
-                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 text-[11px] tracking-[0.35px] uppercase text-ash-gray">
+                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-[10px] bg-[var(--bg-header)] backdrop-blur-sm border border-[var(--border-subtle)] text-[11px] font-mono-code tracking-[0.04em] uppercase text-[var(--text-muted)]">
                       <span>{step.hudLabel}</span>
-                      <span className="flex items-center gap-[8px] text-[12px] normal-case tracking-normal text-silver-mist">
+                      <span className="flex items-center gap-2 text-[12px] font-sans normal-case tracking-normal font-medium text-[var(--text-primary)]">
                         <span
-                          className="w-[8px] h-[8px] rounded-full inline-block shrink-0"
+                          className="w-2 h-2 rounded-full inline-block shrink-0"
                           style={{ backgroundColor: step.accentHex }}
                         />
                         {step.hudMetric}
@@ -273,24 +289,20 @@ export function ServiceScrollNarrative({ onBackToLogin }: ServiceScrollNarrative
       </div>
 
       {/* Bottom footer CTA to return smoothly to the login form */}
-      <div className="border-t border-white/12 px-[18px] sm:px-[30px] py-[48px] bg-white/[0.01]">
-        <div className="max-w-[1280px] w-full mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-[24px]">
-          <div className="space-y-[6px]">
-            <p className="nav-label text-saffron-spark">
+      <div className="border-t border-[var(--border-subtle)] px-4 sm:px-6 lg:px-8 py-12 bg-[var(--bg-surface)]">
+        <div className="max-w-[1280px] w-full mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+          <div className="space-y-1.5">
+            <p className="nav-label text-[var(--brand-primary-text)]">
               ¿Listo para gestionar sus solicitudes?
             </p>
-            <p className="text-[24px] tracking-[-0.48px] text-bone-white">
+            <p className="font-display text-[22px] sm:text-[26px] font-bold tracking-[-0.02em] text-[var(--text-primary)]">
               Inicie sesión con su cuenta corporativa en la vista principal.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onBackToLogin}
-            className="inline-flex items-center gap-[10px] px-[24px] py-[12px] rounded-full bg-bone-white text-void font-medium text-[14px] hover:bg-silver-mist transition-colors cursor-pointer shrink-0"
-          >
-            <ArrowUp className="w-[16px] h-[16px]" aria-hidden="true" />
+          <PrimaryButton onClick={onBackToLogin} className="shrink-0">
+            <ArrowUp className="w-4 h-4" aria-hidden="true" />
             <span>Volver al inicio de sesión</span>
-          </button>
+          </PrimaryButton>
         </div>
       </div>
     </section>

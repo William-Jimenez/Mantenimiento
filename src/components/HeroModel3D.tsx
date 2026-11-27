@@ -6,11 +6,20 @@ interface HeroModel3DProps {
 }
 
 const COLORS = {
-  iris: 0x8052ff,
-  saffron: 0xffb829,
-  verdant: 0x15846e,
-  bone: 0xffffff,
+  cobalt: 0x3b82f6,
+  amber: 0xf59e0b,
+  emerald: 0x10b981,
+  steel: 0xe2e8f0,
+  deepSteel: 0x1e3a8a,
 };
+
+function isLightModeActive(): boolean {
+  if (typeof document === 'undefined') return false;
+  return (
+    document.documentElement.getAttribute('data-theme') === 'light' ||
+    document.documentElement.classList.contains('theme-light')
+  );
+}
 
 /**
  * Bounding radius of the full 3D assembly (orbital rings + nodes + float margin)
@@ -139,8 +148,8 @@ function renderHero2DFallback(
     [2, 4], [4, 3], [3, 5], [5, 2],
   ];
   const projected = verts.map(([x, y, z]) => project(x, y, z));
-  ctx.strokeStyle = '#8052ff';
-  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = '#3b82f6';
+  ctx.globalAlpha = 0.88;
   for (const [a, b] of edges) {
     ctx.beginPath();
     ctx.moveTo(projected[a].px, projected[a].py);
@@ -148,10 +157,10 @@ function renderHero2DFallback(
     ctx.stroke();
   }
 
-  // 2. Precision gear ring (Saffron)
+  // 2. Precision gear ring (Industrial Amber)
   const gearSteps = 32;
-  ctx.strokeStyle = '#ffb829';
-  ctx.globalAlpha = 0.8;
+  ctx.strokeStyle = '#f59e0b';
+  ctx.globalAlpha = 0.85;
   ctx.beginPath();
   for (let i = 0; i <= gearSteps; i++) {
     const a = (i / gearSteps) * Math.PI * 2 + rotY * 0.4;
@@ -162,10 +171,10 @@ function renderHero2DFallback(
   }
   ctx.stroke();
 
-  // 3. Orbital telemetry ring (Verdant)
+  // 3. Orbital telemetry ring (Verdant Emerald)
   const ringSteps = 48;
-  ctx.strokeStyle = '#15846e';
-  ctx.globalAlpha = 0.7;
+  ctx.strokeStyle = '#10b981';
+  ctx.globalAlpha = 0.78;
   ctx.beginPath();
   for (let i = 0; i <= ringSteps; i++) {
     const a = (i / ringSteps) * Math.PI * 2;
@@ -242,6 +251,7 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
         baseOpacity: number;
         baseEmissive: number;
       }> = [];
+      const themeReactiveEdgeMats: Array<{ color: THREE.Color }> = [];
 
       if (isWebGLAvailable()) {
         try {
@@ -264,88 +274,92 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
           );
           camera.position.set(0, 0, computeSafeCameraZ(cssWidth, cssHeight));
 
-          // Same lighting architecture as the original 3D field:
-          // soft ambient + dual directional lights + interactive saffron cursor point light
-          const ambientLight = new THREE.AmbientLight(COLORS.bone, 0.85);
+          // Precision industrial lighting:
+          // soft ambient + dual directional lights + interactive amber cursor point light
+          const lightTheme = isLightModeActive();
+          const accentEdgeColor = lightTheme ? COLORS.deepSteel : COLORS.steel;
+
+          const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
           scene.add(ambientLight);
 
-          const dirLight1 = new THREE.DirectionalLight(COLORS.bone, 1.35);
+          const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.35);
           dirLight1.position.set(4.5, 5.5, 7.5);
           scene.add(dirLight1);
 
-          const dirLight2 = new THREE.DirectionalLight(COLORS.iris, 0.95);
+          const dirLight2 = new THREE.DirectionalLight(COLORS.cobalt, 1.0);
           dirLight2.position.set(-5.0, -4.0, 5.5);
           scene.add(dirLight2);
 
-          cursorLight = new THREE.PointLight(COLORS.saffron, 1.6, 16, 1.5);
+          cursorLight = new THREE.PointLight(COLORS.amber, 1.6, 16, 1.5);
           cursorLight.position.set(0, 0, 4.2);
           scene.add(cursorLight);
 
           rootGroup = new THREE.Group();
           scene.add(rootGroup);
 
-          // 1. Central Crystalline Dala Octahedron Core (Iris)
+          // 1. Central Crystalline Octahedron Core (Cobalt Precision)
           const coreGeo = register(new THREE.OctahedronGeometry(0.95, 0));
           const coreFillMat = register(
             new THREE.MeshStandardMaterial({
-              color: COLORS.iris,
-              emissive: COLORS.iris,
-              emissiveIntensity: 0.3,
-              roughness: 0.3,
-              metalness: 0.65,
+              color: COLORS.cobalt,
+              emissive: COLORS.cobalt,
+              emissiveIntensity: 0.28,
+              roughness: 0.28,
+              metalness: 0.68,
               transparent: true,
-              opacity: 0.55,
+              opacity: 0.56,
               flatShading: true,
               side: THREE.DoubleSide,
             })
           );
           dynamicFillMats.push({
             mat: coreFillMat,
-            baseOpacity: 0.55,
-            baseEmissive: 0.3,
+            baseOpacity: 0.56,
+            baseEmissive: 0.28,
           });
           coreMesh = new THREE.Mesh(coreGeo, coreFillMat);
 
           const coreEdgesGeo = register(new THREE.EdgesGeometry(coreGeo));
           const coreLineMat = register(
             new THREE.LineBasicMaterial({
-              color: COLORS.bone,
+              color: accentEdgeColor,
               transparent: true,
-              opacity: 0.72,
+              opacity: 0.76,
             })
           );
-          dynamicLineMats.push({ mat: coreLineMat, baseOpacity: 0.72 });
+          dynamicLineMats.push({ mat: coreLineMat, baseOpacity: 0.76 });
+          themeReactiveEdgeMats.push(coreLineMat);
           coreMesh.add(new THREE.LineSegments(coreEdgesGeo, coreLineMat));
           rootGroup.add(coreMesh);
 
-          // 2. Outer Geodesic Wireframe Shell (Iris)
+          // 2. Outer Geodesic Wireframe Shell (Cobalt Precision)
           const cageGeo = register(new THREE.IcosahedronGeometry(1.42, isMobile ? 0 : 1));
           const cageEdgesGeo = register(new THREE.EdgesGeometry(cageGeo));
           const cageLineMat = register(
             new THREE.LineBasicMaterial({
-              color: COLORS.iris,
+              color: COLORS.cobalt,
               transparent: true,
-              opacity: 0.52,
+              opacity: 0.55,
             })
           );
-          dynamicLineMats.push({ mat: cageLineMat, baseOpacity: 0.52 });
+          dynamicLineMats.push({ mat: cageLineMat, baseOpacity: 0.55 });
           outerCage = new THREE.LineSegments(cageEdgesGeo, cageLineMat);
           rootGroup.add(outerCage);
 
-          // 3. Precision 3D Mechanical Gear Ring (Saffron)
+          // 3. Precision 3D Mechanical Gear Ring (Industrial Amber)
           gearGroup = new THREE.Group();
           const gearGeo = register(
             createPrecisionGearGeometry(isMobile ? 10 : 12, 1.72, 1.5, 1.18, 0.18)
           );
           const gearFillMat = register(
             new THREE.MeshStandardMaterial({
-              color: COLORS.saffron,
-              emissive: COLORS.saffron,
-              emissiveIntensity: 0.24,
-              roughness: 0.35,
+              color: COLORS.amber,
+              emissive: COLORS.amber,
+              emissiveIntensity: 0.22,
+              roughness: 0.34,
               metalness: 0.65,
               transparent: true,
-              opacity: 0.24,
+              opacity: 0.26,
               flatShading: true,
               side: THREE.DoubleSide,
               depthWrite: false,
@@ -353,36 +367,36 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
           );
           dynamicFillMats.push({
             mat: gearFillMat,
-            baseOpacity: 0.24,
-            baseEmissive: 0.24,
+            baseOpacity: 0.26,
+            baseEmissive: 0.22,
           });
           const gearEdgesGeo = register(new THREE.EdgesGeometry(gearGeo, 18));
           const gearLineMat = register(
             new THREE.LineBasicMaterial({
-              color: COLORS.saffron,
+              color: COLORS.amber,
               transparent: true,
-              opacity: 0.82,
+              opacity: 0.86,
             })
           );
-          dynamicLineMats.push({ mat: gearLineMat, baseOpacity: 0.82 });
+          dynamicLineMats.push({ mat: gearLineMat, baseOpacity: 0.86 });
 
           gearGroup.add(new THREE.Mesh(gearGeo, gearFillMat));
           gearGroup.add(new THREE.LineSegments(gearEdgesGeo, gearLineMat));
           gearGroup.rotation.x = Math.PI / 5;
           rootGroup.add(gearGroup);
 
-          // 4. Hexagonal Precision Nut Housing (Verdant)
+          // 4. Hexagonal Precision Nut Housing (Verdant Emerald)
           hexHousing = new THREE.Group();
           const hexGeo = register(new THREE.CylinderGeometry(1.22, 1.22, 0.32, 6, 1, true));
           const hexFillMat = register(
             new THREE.MeshStandardMaterial({
-              color: COLORS.verdant,
-              emissive: COLORS.verdant,
-              emissiveIntensity: 0.25,
-              roughness: 0.35,
+              color: COLORS.emerald,
+              emissive: COLORS.emerald,
+              emissiveIntensity: 0.24,
+              roughness: 0.34,
               metalness: 0.6,
               transparent: true,
-              opacity: 0.2,
+              opacity: 0.22,
               flatShading: true,
               side: THREE.DoubleSide,
               depthWrite: false,
@@ -390,18 +404,18 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
           );
           dynamicFillMats.push({
             mat: hexFillMat,
-            baseOpacity: 0.2,
-            baseEmissive: 0.25,
+            baseOpacity: 0.22,
+            baseEmissive: 0.24,
           });
           const hexEdgesGeo = register(new THREE.EdgesGeometry(hexGeo));
           const hexLineMat = register(
             new THREE.LineBasicMaterial({
-              color: COLORS.verdant,
+              color: COLORS.emerald,
               transparent: true,
-              opacity: 0.76,
+              opacity: 0.8,
             })
           );
-          dynamicLineMats.push({ mat: hexLineMat, baseOpacity: 0.76 });
+          dynamicLineMats.push({ mat: hexLineMat, baseOpacity: 0.8 });
 
           hexHousing.add(new THREE.Mesh(hexGeo, hexFillMat));
           hexHousing.add(new THREE.LineSegments(hexEdgesGeo, hexLineMat));
@@ -415,9 +429,9 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
           );
           const ring1Mat = register(
             new THREE.MeshBasicMaterial({
-              color: COLORS.verdant,
+              color: COLORS.emerald,
               transparent: true,
-              opacity: 0.65,
+              opacity: 0.68,
             })
           );
           const ring1Mesh = new THREE.Mesh(ring1Geo, ring1Mat);
@@ -425,12 +439,13 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
           orbitPrimary.add(ring1Mesh);
 
           const nodeGeo = register(new THREE.OctahedronGeometry(0.1, 0));
-          const nodeSaffronMat = register(new THREE.MeshBasicMaterial({ color: COLORS.saffron }));
-          const nodeBoneMat = register(new THREE.MeshBasicMaterial({ color: COLORS.bone }));
+          const nodeAmberMat = register(new THREE.MeshBasicMaterial({ color: COLORS.amber }));
+          const nodeSteelMat = register(new THREE.MeshBasicMaterial({ color: accentEdgeColor }));
+          themeReactiveEdgeMats.push(nodeSteelMat);
           const nodeCount = isMobile ? 4 : 6;
           for (let i = 0; i < nodeCount; i++) {
             const a = (i / nodeCount) * Math.PI * 2;
-            const node = new THREE.Mesh(nodeGeo, i % 2 === 0 ? nodeSaffronMat : nodeBoneMat);
+            const node = new THREE.Mesh(nodeGeo, i % 2 === 0 ? nodeAmberMat : nodeSteelMat);
             node.position.set(
               Math.cos(a) * 2.05,
               Math.sin(a) * Math.sin(Math.PI / 2.4) * 0.45,
@@ -446,9 +461,9 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
           );
           const ring2Mat = register(
             new THREE.MeshBasicMaterial({
-              color: COLORS.iris,
+              color: COLORS.cobalt,
               transparent: true,
-              opacity: 0.45,
+              opacity: 0.48,
             })
           );
           const ring2Mesh = new THREE.Mesh(ring2Geo, ring2Mat);
@@ -678,6 +693,21 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
         resizeObserver.observe(container);
       }
 
+      let themeObserver: MutationObserver | null = null;
+      if (typeof MutationObserver !== 'undefined') {
+        themeObserver = new MutationObserver(() => {
+          const nextColor = isLightModeActive() ? COLORS.deepSteel : COLORS.steel;
+          for (const mat of themeReactiveEdgeMats) {
+            mat.color.setHex(nextColor);
+          }
+          renderFrame();
+        });
+        themeObserver.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ['data-theme', 'class'],
+        });
+      }
+
       container.addEventListener('pointerdown', handlePointerDown);
       container.addEventListener('pointermove', handlePointerMove);
       container.addEventListener('pointerup', handlePointerUp);
@@ -692,6 +722,7 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
         if (rafId !== 0) window.cancelAnimationFrame(rafId);
         observer?.disconnect();
         resizeObserver?.disconnect();
+        themeObserver?.disconnect();
         container.removeEventListener('pointerdown', handlePointerDown);
         container.removeEventListener('pointermove', handlePointerMove);
         container.removeEventListener('pointerup', handlePointerUp);
@@ -740,13 +771,12 @@ export function HeroModel3D({ className = '' }: HeroModel3DProps) {
         isDragging ? 'cursor-grabbing' : 'cursor-grab'
       } ${className}`}
     >
-      {/* Ambient radial glow matching the original hero lighting */}
+      {/* Ambient radial glow synchronized with active theme tokens */}
       <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none"
         style={{
-          background:
-            'radial-gradient(closest-side at 50% 50%, rgba(128, 82, 255, 0.14) 0%, rgba(21, 132, 110, 0.05) 48%, transparent 86%)',
+          background: 'var(--hero-glow)',
         }}
       />
 

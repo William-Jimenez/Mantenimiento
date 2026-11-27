@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Plus, Tag } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
   EmptyState,
@@ -7,7 +8,9 @@ import {
   GhostButton,
   inputBaseClass,
   OutlineButton,
+  PageHeader,
   PrimaryButton,
+  SurfaceCard,
 } from '../components/CommonUI';
 import { ErrorScreen } from './ErrorScreen';
 
@@ -50,45 +53,49 @@ export function CategoriesScreen() {
   };
 
   return (
-    <section className="max-w-[820px] space-y-[36px]">
-      <div className="space-y-[12px]">
-        <p className="nav-label text-saffron-spark">Administración · Catálogo SU-06</p>
-        <h1 className="text-[42px] sm:text-[56px] leading-[1.08] tracking-[-1.68px] text-bone-white">
-          Categorías
-        </h1>
-        <p className="body-ultralight text-silver-mist max-w-[580px]">
-          Administre el catálogo de categorías utilizado tanto en la clasificación manual como en la validación de sugerencias de IA. Las categorías desactivadas se conservan en el histórico.
-        </p>
-      </div>
+    <section className="max-w-[840px] space-y-6">
+      <PageHeader
+        eyebrow="Administración · Catálogo SU-06"
+        title="Categorías"
+        description="Administre el catálogo de categorías utilizado tanto en la clasificación manual como en la validación de sugerencias de IA. Las categorías desactivadas se conservan en el histórico."
+      />
 
       {/* Add new category */}
-      <form onSubmit={handleCrear} className="flex flex-col sm:flex-row items-stretch sm:items-end gap-[12px]">
-        <div className="flex-1">
-          <FieldLabel htmlFor="cat-nueva">Nueva categoría</FieldLabel>
-          <input
-            id="cat-nueva"
-            type="text"
-            value={nuevoNombre}
-            onChange={(e) => setNuevoNombre(e.target.value)}
-            placeholder="Ej: Refrigeración"
-            className={inputBaseClass}
-          />
-          <FieldError message={errorCrear} />
-        </div>
-        <PrimaryButton type="submit">Agregar categoría</PrimaryButton>
-      </form>
+      <SurfaceCard>
+        <form
+          onSubmit={handleCrear}
+          className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3"
+        >
+          <div className="flex-1">
+            <FieldLabel htmlFor="cat-nueva">Nueva categoría</FieldLabel>
+            <input
+              id="cat-nueva"
+              type="text"
+              value={nuevoNombre}
+              onChange={(e) => setNuevoNombre(e.target.value)}
+              placeholder="Ej: Refrigeración"
+              className={inputBaseClass}
+            />
+            <FieldError message={errorCrear} />
+          </div>
+          <PrimaryButton type="submit" className="shrink-0">
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            <span>Agregar categoría</span>
+          </PrimaryButton>
+        </form>
+      </SurfaceCard>
 
       {categorias.length === 0 ? (
         <EmptyState title="No hay categorías registradas" />
       ) : (
-        <div className="border-t border-white/12 divide-y divide-white/10">
+        <SurfaceCard padded={false} className="overflow-hidden divide-y divide-[var(--border-subtle)]">
           {categorias.map((cat) => (
             <div
               key={cat.id}
-              className="py-[16px] flex flex-col sm:flex-row sm:items-center justify-between gap-[12px]"
+              className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[var(--bg-subtle)]/40 transition-colors"
             >
               {editingId === cat.id ? (
-                <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-[12px]">
+                <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <div className="flex-1">
                     <input
                       type="text"
@@ -99,7 +106,7 @@ export function CategoriesScreen() {
                     />
                     <FieldError message={errorEdit} />
                   </div>
-                  <div className="flex items-center gap-[8px]">
+                  <div className="flex items-center gap-2 shrink-0">
                     <PrimaryButton onClick={() => handleGuardarEdicion(cat.id)}>
                       Guardar
                     </PrimaryButton>
@@ -115,14 +122,35 @@ export function CategoriesScreen() {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center gap-[12px]">
-                    <span className="text-[18px] text-bone-white">{cat.nombre}</span>
-                    <span aria-hidden="true" className="text-ash-gray">·</span>
-                    <span className={`text-[14px] ${cat.activa ? 'text-deep-verdant' : 'text-ash-gray'}`}>
+                  <div className="flex items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="w-8 h-8 rounded-[8px] bg-[var(--bg-subtle)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-muted)] shrink-0"
+                    >
+                      <Tag className="w-4 h-4" />
+                    </span>
+                    <span className="text-[16px] font-semibold text-[var(--text-primary)]">
+                      {cat.nombre}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[6px] border text-[12px] font-semibold ${
+                        cat.activa
+                          ? 'bg-[var(--status-success-soft)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
+                          : 'bg-[var(--bg-subtle)] border-[var(--border-default)] text-[var(--text-muted)]'
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          cat.activa
+                            ? 'bg-[var(--status-success-text)]'
+                            : 'bg-[var(--text-muted)]'
+                        }`}
+                      />
                       {cat.activa ? 'Activa' : 'Inactiva'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-[12px]">
+                  <div className="flex items-center gap-1">
                     <GhostButton
                       onClick={() => {
                         setEditingId(cat.id);
@@ -140,7 +168,7 @@ export function CategoriesScreen() {
               )}
             </div>
           ))}
-        </div>
+        </SurfaceCard>
       )}
     </section>
   );

@@ -1,13 +1,17 @@
 import React, { useMemo } from 'react';
+import { ChevronRight, Plus, RotateCcw } from 'lucide-react';
 import { useApp, useSolicitudesVisibles } from '../context/AppContext';
 import { ESTADOS_ORDEN, formatearFecha } from '../services/domainRules';
 import {
   EmptyState,
   EstadoLabel,
+  FilterChip,
   GhostButton,
   inputBaseClass,
   OutlineButton,
+  PageHeader,
   PrimaryButton,
+  SurfaceCard,
 } from '../components/CommonUI';
 import { EstadoNombre } from '../types/domain';
 
@@ -107,166 +111,162 @@ export function RequestsListScreen() {
   const tecnicosActivos = empleados.filter((e) => e.esTecnico);
 
   return (
-    <section className="space-y-[36px]">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-[24px]">
-        <div className="space-y-[12px]">
-          <p className="nav-label text-saffron-spark">
-            {isAdmin
-              ? 'M3 · M5 Seguimiento Global'
-              : isTecnico
-              ? 'Bandeja Técnica · Reparaciones Asignadas'
-              : 'Portal de Cliente · Mis Solicitudes'}
-          </p>
-          <h1 className="text-[42px] sm:text-[56px] leading-[1.08] tracking-[-1.68px] text-bone-white">
-            {isTecnico ? 'Solicitudes asignadas' : isCliente ? 'Mis solicitudes' : 'Solicitudes'}
-          </h1>
-          <p className="body-ultralight text-silver-mist">
-            {isAdmin
-              ? 'Consulte, asigne técnicos y filtre todas las solicitudes registradas en la plataforma.'
-              : isTecnico
-              ? 'Consulte únicamente las solicitudes asignadas a su cargo, actualice su estado y registre el trabajo realizado.'
-              : 'Consulte el estado y avance de sus propias solicitudes de mantenimiento.'}
-          </p>
-        </div>
+    <section className="space-y-6">
+      <PageHeader
+        eyebrow={
+          isAdmin
+            ? 'M3 · M5 Seguimiento Global'
+            : isTecnico
+            ? 'Bandeja Técnica · Reparaciones Asignadas'
+            : 'Portal de Cliente · Mis Solicitudes'
+        }
+        title={isTecnico ? 'Solicitudes asignadas' : isCliente ? 'Mis solicitudes' : 'Solicitudes'}
+        description={
+          isAdmin
+            ? 'Consulte, asigne técnicos y filtre todas las solicitudes registradas en la plataforma.'
+            : isTecnico
+            ? 'Consulte únicamente las solicitudes asignadas a su cargo, actualice su estado y registre el trabajo realizado.'
+            : 'Consulte el estado y avance de sus propias solicitudes de mantenimiento.'
+        }
+        actions={
+          !isTecnico ? (
+            <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              <span>Nueva solicitud</span>
+            </PrimaryButton>
+          ) : undefined
+        }
+      />
 
-        {!isTecnico && (
-          <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
-            Nueva solicitud
-          </PrimaryButton>
-        )}
-      </div>
-
-      {/* Multi-state filter bar (HU-09) */}
-      <div className="space-y-[18px] pb-[24px] border-b border-white/12">
-        <div className="flex flex-wrap items-center justify-between gap-[12px]">
-          <div className="flex flex-wrap items-center gap-[8px]" role="group" aria-label="Filtrar por estado">
+      {/* Filter Toolbar Card (HU-09) */}
+      <SurfaceCard className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="flex flex-wrap items-center gap-2"
+            role="group"
+            aria-label="Filtrar por estado"
+          >
             {ESTADOS_ORDEN.map((estado) => {
               const active = filtrosSolicitudes.estados.includes(estado);
               return (
-                <button
+                <FilterChip
                   key={estado}
-                  type="button"
-                  aria-pressed={active}
+                  active={active}
                   onClick={() => toggleEstado(estado)}
-                  className={`px-[14px] py-[8px] rounded-[24px] text-[13px] uppercase tracking-[0.35px] cursor-pointer transition-colors ${
-                    active
-                      ? 'bg-electric-iris text-bone-white font-semibold'
-                      : 'text-ash-gray hover:text-bone-white border border-white/15'
-                  }`}
                 >
                   {estado}
-                </button>
+                </FilterChip>
               );
             })}
           </div>
 
-          <span className="text-[14px] tabular-nums text-silver-mist">
+          <span className="font-mono-code text-[13px] font-medium px-3 py-1.5 rounded-[8px] bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
             Total: {filtradas.length} resultado(s)
           </span>
         </div>
 
         {/* Role-specific additional filters */}
-        <div className="flex flex-wrap items-center gap-[12px]">
-          {isTecnico && (
-            <button
-              type="button"
-              aria-pressed={!!filtrosSolicitudes.soloAsignadasAMi}
-              onClick={() =>
-                setFiltrosSolicitudes((prev) => ({
-                  ...prev,
-                  soloAsignadasAMi: !prev.soloAsignadasAMi,
-                  page: 0,
-                }))
-              }
-              className={`px-[14px] py-[8px] rounded-[24px] text-[13px] cursor-pointer transition-colors ${
-                filtrosSolicitudes.soloAsignadasAMi
-                  ? 'bg-deep-verdant text-bone-white font-semibold'
-                  : 'text-ash-gray hover:text-bone-white border border-white/15'
-              }`}
-            >
-              Solo asignadas a mí
-            </button>
-          )}
-
-          {isAdmin && (
-            <>
-              <select
-                aria-label="Filtrar por solicitante"
-                value={filtrosSolicitudes.solicitanteId ?? 0}
-                onChange={(e) =>
+        {(isTecnico || isAdmin || hayFiltros) && (
+          <div className="pt-3.5 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-3">
+            {isTecnico && (
+              <FilterChip
+                variant="success"
+                active={!!filtrosSolicitudes.soloAsignadasAMi}
+                onClick={() =>
                   setFiltrosSolicitudes((prev) => ({
                     ...prev,
-                    solicitanteId: Number(e.target.value) || undefined,
+                    soloAsignadasAMi: !prev.soloAsignadasAMi,
                     page: 0,
                   }))
                 }
-                className={`${inputBaseClass} w-auto text-[14px] py-[8px]`}
               >
-                <option value={0}>Todos los solicitantes</option>
-                {empleados.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nombres} {e.apellidos}
-                  </option>
-                ))}
-              </select>
+                Solo asignadas a mí
+              </FilterChip>
+            )}
 
-              <select
-                aria-label="Filtrar por técnico"
-                value={filtrosSolicitudes.tecnicoId ?? 0}
-                onChange={(e) =>
-                  setFiltrosSolicitudes((prev) => ({
-                    ...prev,
-                    tecnicoId: Number(e.target.value) || undefined,
-                    page: 0,
-                  }))
-                }
-                className={`${inputBaseClass} w-auto text-[14px] py-[8px]`}
-              >
-                <option value={0}>Todos los técnicos</option>
-                {tecnicosActivos.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.nombres} {e.apellidos}
-                  </option>
-                ))}
-              </select>
+            {isAdmin && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1 min-w-[260px]">
+                <select
+                  aria-label="Filtrar por solicitante"
+                  value={filtrosSolicitudes.solicitanteId ?? 0}
+                  onChange={(e) =>
+                    setFiltrosSolicitudes((prev) => ({
+                      ...prev,
+                      solicitanteId: Number(e.target.value) || undefined,
+                      page: 0,
+                    }))
+                  }
+                  className={`${inputBaseClass} !min-h-[40px] !py-2 text-[14px]`}
+                >
+                  <option value={0}>Todos los solicitantes</option>
+                  {empleados.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nombres} {e.apellidos}
+                    </option>
+                  ))}
+                </select>
 
-              <input
-                type="date"
-                aria-label="Fecha desde"
-                value={filtrosSolicitudes.desde ?? ''}
-                onChange={(e) =>
-                  setFiltrosSolicitudes((prev) => ({
-                    ...prev,
-                    desde: e.target.value || undefined,
-                    page: 0,
-                  }))
-                }
-                className={`${inputBaseClass} w-auto text-[14px] py-[8px]`}
-              />
+                <select
+                  aria-label="Filtrar por técnico"
+                  value={filtrosSolicitudes.tecnicoId ?? 0}
+                  onChange={(e) =>
+                    setFiltrosSolicitudes((prev) => ({
+                      ...prev,
+                      tecnicoId: Number(e.target.value) || undefined,
+                      page: 0,
+                    }))
+                  }
+                  className={`${inputBaseClass} !min-h-[40px] !py-2 text-[14px]`}
+                >
+                  <option value={0}>Todos los técnicos</option>
+                  {tecnicosActivos.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.nombres} {e.apellidos}
+                    </option>
+                  ))}
+                </select>
 
-              <input
-                type="date"
-                aria-label="Fecha hasta"
-                value={filtrosSolicitudes.hasta ?? ''}
-                onChange={(e) =>
-                  setFiltrosSolicitudes((prev) => ({
-                    ...prev,
-                    hasta: e.target.value || undefined,
-                    page: 0,
-                  }))
-                }
-                className={`${inputBaseClass} w-auto text-[14px] py-[8px]`}
-              />
-            </>
-          )}
+                <input
+                  type="date"
+                  aria-label="Fecha desde"
+                  value={filtrosSolicitudes.desde ?? ''}
+                  onChange={(e) =>
+                    setFiltrosSolicitudes((prev) => ({
+                      ...prev,
+                      desde: e.target.value || undefined,
+                      page: 0,
+                    }))
+                  }
+                  className={`${inputBaseClass} !min-h-[40px] !py-2 text-[14px]`}
+                />
 
-          {hayFiltros && (
-            <GhostButton onClick={limpiarFiltros}>Quitar filtros</GhostButton>
-          )}
-        </div>
-      </div>
+                <input
+                  type="date"
+                  aria-label="Fecha hasta"
+                  value={filtrosSolicitudes.hasta ?? ''}
+                  onChange={(e) =>
+                    setFiltrosSolicitudes((prev) => ({
+                      ...prev,
+                      hasta: e.target.value || undefined,
+                      page: 0,
+                    }))
+                  }
+                  className={`${inputBaseClass} !min-h-[40px] !py-2 text-[14px]`}
+                />
+              </div>
+            )}
 
-      {/* Results table / empty states per User Flow 4.6 */}
+            {hayFiltros && (
+              <GhostButton onClick={limpiarFiltros}>
+                <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Quitar filtros</span>
+              </GhostButton>
+            )}
+          </div>
+        )}
+      </SurfaceCard>
+
+      {/* Results Table (Desktop) + Stacked Cards (Mobile) */}
       {paginaItems.length === 0 ? (
         <EmptyState
           title={
@@ -288,109 +288,177 @@ export function RequestsListScreen() {
               <OutlineButton onClick={limpiarFiltros}>Quitar filtro</OutlineButton>
             ) : !isTecnico ? (
               <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
-                Nueva solicitud
+                <Plus className="w-4 h-4" aria-hidden="true" />
+                <span>Nueva solicitud</span>
               </PrimaryButton>
             ) : undefined
           }
         />
       ) : (
-        <div className="space-y-[24px]">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white/15 text-[12px] uppercase tracking-[0.35px] text-ash-gray">
-                  <th className="py-[12px] pr-[18px] font-semibold">Código</th>
-                  <th className="py-[12px] pr-[18px] font-semibold">Recurso</th>
-                  <th className="py-[12px] pr-[18px] font-semibold">Estado</th>
-                  {isAdmin && (
-                    <>
-                      <th className="py-[12px] pr-[18px] font-semibold">Solicitante</th>
-                      <th className="py-[12px] pr-[18px] font-semibold">Técnico</th>
-                    </>
-                  )}
-                  {!isAdmin && (
-                    <th className="py-[12px] pr-[18px] font-semibold">Trabajo realizado</th>
-                  )}
-                  <th className="py-[12px] text-right font-semibold">Fecha</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/10 text-[15px]">
-                {paginaItems.map((sol) => {
-                  const rec = recursos.find((r) => r.id === sol.recursoId);
-                  const solEmp = isAdmin
-                    ? empleados.find((e) => e.id === sol.solicitanteId)
-                    : undefined;
-                  const asig = isAdmin
-                    ? asignaciones.find((a) => a.vigente && a.solicitudId === sol.id)
-                    : undefined;
-                  const tecEmp =
-                    isAdmin && asig
-                      ? empleados.find((e) => e.id === asig.tecnicoId)
+        <div className="space-y-4">
+          {/* Desktop / Tablet Data Table */}
+          <SurfaceCard padded={false} className="hidden md:block overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[var(--bg-subtle)]/70 border-b border-[var(--border-subtle)] text-[12px] uppercase tracking-[0.05em] text-[var(--text-muted)]">
+                    <th className="py-3.5 pl-5 pr-4 font-semibold">Código</th>
+                    <th className="py-3.5 px-4 font-semibold">Recurso</th>
+                    <th className="py-3.5 px-4 font-semibold">Estado</th>
+                    {isAdmin && (
+                      <>
+                        <th className="py-3.5 px-4 font-semibold">Solicitante</th>
+                        <th className="py-3.5 px-4 font-semibold">Técnico</th>
+                      </>
+                    )}
+                    {!isAdmin && (
+                      <th className="py-3.5 px-4 font-semibold">Trabajo realizado</th>
+                    )}
+                    <th className="py-3.5 pl-4 pr-5 text-right font-semibold">Fecha</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)] text-[14px]">
+                  {paginaItems.map((sol) => {
+                    const rec = recursos.find((r) => r.id === sol.recursoId);
+                    const solEmp = isAdmin
+                      ? empleados.find((e) => e.id === sol.solicitanteId)
                       : undefined;
+                    const asig = isAdmin
+                      ? asignaciones.find((a) => a.vigente && a.solicitudId === sol.id)
+                      : undefined;
+                    const tecEmp =
+                      isAdmin && asig
+                        ? empleados.find((e) => e.id === asig.tecnicoId)
+                        : undefined;
 
-                  return (
-                    <tr
-                      key={sol.id}
-                      onClick={() => navigate(`/solicitudes/${sol.id}`)}
-                      className="hover:bg-white/[0.04] transition-colors cursor-pointer"
-                    >
-                      <td className="py-[16px] pr-[18px] tabular-nums text-bone-white whitespace-nowrap">
-                        <a
-                          href={`/solicitudes/${sol.id}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            navigate(`/solicitudes/${sol.id}`);
-                          }}
-                          className="hover:text-electric-iris transition-colors"
-                        >
-                          {sol.codigo}
-                        </a>
-                      </td>
-                      <td className="py-[16px] pr-[18px]">
-                        <div className="text-bone-white">{rec?.nombre ?? 'Recurso'}</div>
-                        <div className="text-[13px] text-ash-gray tabular-nums">
-                          {rec?.codigo}
-                        </div>
-                      </td>
-                      <td className="py-[16px] pr-[18px]">
-                        <EstadoLabel estado={sol.estado} />
-                      </td>
-                      {isAdmin ? (
-                        <>
-                          <td className="py-[16px] pr-[18px] text-silver-mist text-[14px]">
-                            {solEmp
-                              ? `${solEmp.nombres} ${solEmp.apellidos}${
-                                  !solEmp.activo ? ' (inactivo)' : ''
-                                }`
-                              : '—'}
-                          </td>
-                          <td className="py-[16px] pr-[18px] text-silver-mist text-[14px]">
-                            {tecEmp ? `${tecEmp.nombres} ${tecEmp.apellidos}` : 'Sin asignar'}
-                          </td>
-                        </>
-                      ) : (
-                        <td className="py-[16px] pr-[18px] text-silver-mist text-[14px] max-w-[320px] truncate">
-                          {sol.trabajoRealizado || sol.motivoCierre || 'Pendiente de registro técnico'}
+                    return (
+                      <tr
+                        key={sol.id}
+                        onClick={() => navigate(`/solicitudes/${sol.id}`)}
+                        className="group hover:bg-[var(--bg-subtle)]/60 transition-colors duration-150 cursor-pointer"
+                      >
+                        <td className="py-4 pl-5 pr-4 whitespace-nowrap">
+                          <a
+                            href={`/solicitudes/${sol.id}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              navigate(`/solicitudes/${sol.id}`);
+                            }}
+                            className="font-mono-code text-[13px] font-semibold px-2 py-1 rounded-[6px] bg-[var(--bg-subtle)] text-[var(--text-primary)] group-hover:text-[var(--brand-primary-text)] transition-colors"
+                          >
+                            {sol.codigo}
+                          </a>
                         </td>
-                      )}
-                      <td className="py-[16px] text-right tabular-nums text-[14px] text-ash-gray whitespace-nowrap">
-                        {formatearFecha(sol.creadaEn)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <td className="py-4 px-4">
+                          <div className="font-medium text-[var(--text-primary)]">
+                            {rec?.nombre ?? 'Recurso'}
+                          </div>
+                          <div className="text-[12px] font-mono-code text-[var(--text-muted)] mt-0.5">
+                            {rec?.codigo}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <EstadoLabel estado={sol.estado} />
+                        </td>
+                        {isAdmin ? (
+                          <>
+                            <td className="py-4 px-4 text-[var(--text-secondary)]">
+                              {solEmp
+                                ? `${solEmp.nombres} ${solEmp.apellidos}${
+                                    !solEmp.activo ? ' (inactivo)' : ''
+                                  }`
+                                : '—'}
+                            </td>
+                            <td className="py-4 px-4 text-[var(--text-secondary)]">
+                              {tecEmp ? (
+                                `${tecEmp.nombres} ${tecEmp.apellidos}`
+                              ) : (
+                                <span className="text-[var(--text-muted)]">Sin asignar</span>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          <td className="py-4 px-4 text-[var(--text-secondary)] max-w-[320px] truncate">
+                            {sol.trabajoRealizado ||
+                              sol.motivoCierre ||
+                              'Pendiente de registro técnico'}
+                          </td>
+                        )}
+                        <td className="py-4 pl-4 pr-5 text-right font-mono-code text-[12px] text-[var(--text-muted)] whitespace-nowrap">
+                          {formatearFecha(sol.creadaEn)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </SurfaceCard>
+
+          {/* Mobile Card List (< 768px) */}
+          <div className="md:hidden space-y-3">
+            {paginaItems.map((sol) => {
+              const rec = recursos.find((r) => r.id === sol.recursoId);
+              const solEmp = isAdmin
+                ? empleados.find((e) => e.id === sol.solicitanteId)
+                : undefined;
+              const asig = isAdmin
+                ? asignaciones.find((a) => a.vigente && a.solicitudId === sol.id)
+                : undefined;
+              const tecEmp =
+                isAdmin && asig
+                  ? empleados.find((e) => e.id === asig.tecnicoId)
+                  : undefined;
+
+              return (
+                <button
+                  key={sol.id}
+                  type="button"
+                  onClick={() => navigate(`/solicitudes/${sol.id}`)}
+                  className="w-full text-left surface-card p-4 space-y-3 hover:border-[var(--border-strong)] transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono-code text-[12px] font-semibold px-2 py-0.5 rounded-[6px] bg-[var(--bg-subtle)] text-[var(--brand-primary-text)]">
+                      {sol.codigo}
+                    </span>
+                    <EstadoLabel estado={sol.estado} />
+                  </div>
+                  <div>
+                    <p className="text-[15px] font-semibold text-[var(--text-primary)]">
+                      {rec?.nombre ?? 'Recurso'}
+                    </p>
+                    <p className="text-[12px] font-mono-code text-[var(--text-muted)]">
+                      {rec?.codigo}
+                    </p>
+                  </div>
+                  <div className="pt-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2 text-[12px] text-[var(--text-secondary)]">
+                    <span className="truncate">
+                      {isAdmin
+                        ? `${solEmp ? `${solEmp.nombres} ${solEmp.apellidos}` : '—'} · ${
+                            tecEmp ? `${tecEmp.nombres} ${tecEmp.apellidos}` : 'Sin asignar'
+                          }`
+                        : sol.trabajoRealizado ||
+                          sol.motivoCierre ||
+                          'Pendiente de registro técnico'}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0 font-mono-code text-[var(--text-muted)]">
+                      <span>{formatearFecha(sol.creadaEn)}</span>
+                      <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {/* Pagination (20 per page, HU-08) */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-[12px] border-t border-white/10 text-[14px]">
-              <span className="tabular-nums text-ash-gray">
+            <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)] text-[14px]">
+              <span className="font-mono-code text-[13px] text-[var(--text-muted)]">
                 Página {currentPage + 1} de {totalPages}
               </span>
-              <div className="flex items-center gap-[12px]">
+              <div className="flex items-center gap-2.5">
                 <OutlineButton
                   disabled={currentPage === 0}
                   onClick={() =>

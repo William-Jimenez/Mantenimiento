@@ -24,9 +24,9 @@ export function ThemeLanguageControls({ className = '' }: { className?: string }
     <div
       role="group"
       aria-label={isEs ? 'Preferencias de visualización e idioma' : 'Display and language preferences'}
-      className={`inline-flex items-center gap-[8px] shrink-0 ${className}`}
+      className={`inline-flex items-center gap-2 shrink-0 ${className}`}
     >
-      {/* Botón para alternar tema entre oscuro y claro (solo icono, sin texto visible) */}
+      {/* Theme Toggle (40x40 accessible touch target) */}
       <button
         type="button"
         data-testid="theme-toggle-btn"
@@ -34,20 +34,16 @@ export function ThemeLanguageControls({ className = '' }: { className?: string }
         aria-label={themeAriaLabel}
         aria-pressed={!isDark}
         title={themeAriaLabel}
-        className={`inline-flex items-center justify-center w-[36px] h-[36px] min-h-[36px] rounded-full border transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-electric-iris focus-visible:outline-offset-2 ${
-          isDark
-            ? 'border-white/20 bg-white/[0.04] text-bone-white hover:border-saffron-spark'
-            : 'border-saffron-spark/60 bg-saffron-spark/10 text-bone-white hover:border-electric-iris'
-        }`}
+        className="inline-flex items-center justify-center w-[40px] h-[40px] rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] hover:border-[var(--border-strong)] text-[var(--text-primary)] transition-[background-color,border-color,transform] duration-150 ease-out active:scale-[0.96] cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--brand-primary-text)] focus-visible:outline-offset-2"
       >
         {isDark ? (
-          <Moon className="w-[15px] h-[15px] text-electric-iris shrink-0" aria-hidden="true" />
+          <Sun className="w-[17px] h-[17px] text-[var(--status-warning-text)] shrink-0" aria-hidden="true" />
         ) : (
-          <Sun className="w-[15px] h-[15px] text-saffron-spark shrink-0" aria-hidden="true" />
+          <Moon className="w-[17px] h-[17px] text-[var(--brand-primary-text)] shrink-0" aria-hidden="true" />
         )}
       </button>
 
-      {/* Botón para alternar idioma entre español (ES) e inglés (EN) */}
+      {/* Language Toggle ES / EN (40px min-height) */}
       <button
         type="button"
         data-testid="lang-toggle-btn"
@@ -55,17 +51,17 @@ export function ThemeLanguageControls({ className = '' }: { className?: string }
         aria-label={langAriaLabel}
         aria-pressed={!isEs}
         title={langAriaLabel}
-        className="inline-flex items-center gap-[6px] px-[12px] py-[6px] min-h-[36px] rounded-full border border-white/20 bg-white/[0.04] hover:border-electric-iris text-[12px] font-semibold uppercase tracking-[0.35px] text-bone-white transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-electric-iris focus-visible:outline-offset-2"
+        className="inline-flex items-center gap-1.5 px-3 h-[40px] rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-surface)] hover:bg-[var(--bg-subtle)] hover:border-[var(--border-strong)] text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--text-primary)] transition-[background-color,border-color,transform] duration-150 ease-out active:scale-[0.96] cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--brand-primary-text)] focus-visible:outline-offset-2"
       >
-        <Globe className="w-[14px] h-[14px] text-saffron-spark shrink-0" aria-hidden="true" />
-        <span className="inline-flex items-center gap-[4px]">
-          <span className={isEs ? 'text-saffron-spark font-bold' : 'text-ash-gray font-normal'}>
+        <Globe className="w-[15px] h-[15px] text-[var(--brand-primary-text)] shrink-0" aria-hidden="true" />
+        <span className="inline-flex items-center gap-1">
+          <span className={isEs ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-muted)] font-normal'}>
             ES
           </span>
-          <span aria-hidden="true" className="text-ash-gray">
+          <span aria-hidden="true" className="text-[var(--border-strong)]">
             /
           </span>
-          <span className={!isEs ? 'text-saffron-spark font-bold' : 'text-ash-gray font-normal'}>
+          <span className={!isEs ? 'text-[var(--text-primary)] font-bold' : 'text-[var(--text-muted)] font-normal'}>
             EN
           </span>
         </span>

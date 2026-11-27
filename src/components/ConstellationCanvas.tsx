@@ -6,42 +6,46 @@ export function LogoLockup({ onClick }: { onClick?: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-[12px] whitespace-nowrap shrink-0 text-left group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-iris rounded-[24px] pr-2"
+      className="flex items-center gap-2.5 whitespace-nowrap shrink-0 text-left group cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--brand-primary-text)] focus-visible:outline-offset-2 rounded-[10px] py-1 pr-2"
     >
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden="true"
-        className="shrink-0"
-      >
-        <defs>
-          <linearGradient
-            id="dala-brand-grad"
-            x1="0"
-            y1="0"
-            x2="24"
-            y2="24"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop offset="0%" stopColor="#8052ff" />
-            <stop offset="100%" stopColor="#15846e" />
-          </linearGradient>
-        </defs>
-        <polygon
-          points="12,2 22,20 2,20"
-          stroke="url(#dala-brand-grad)"
-          strokeWidth="1.75"
+      <span className="w-8 h-8 rounded-[9px] bg-[var(--brand-primary-soft)] border border-[var(--brand-primary-border)] flex items-center justify-center shrink-0 transition-[background-color,border-color,transform] duration-150 group-hover:scale-[1.03]">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
           fill="none"
-        />
-        <polygon
-          points="12,8 17,18 7,18"
-          fill="url(#dala-brand-grad)"
-          fillOpacity="0.85"
-        />
-      </svg>
-      <span className="text-[14px] font-semibold uppercase tracking-[0.35px] text-bone-white group-hover:text-silver-mist transition-colors whitespace-nowrap">
+          aria-hidden="true"
+          className="shrink-0"
+        >
+          <defs>
+            <linearGradient
+              id="precision-brand-grad"
+              x1="2"
+              y1="2"
+              x2="22"
+              y2="22"
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop offset="0%" stopColor="#3b82f6" />
+              <stop offset="100%" stopColor="#10b981" />
+            </linearGradient>
+          </defs>
+          <polygon
+            points="12,2.5 21.5,19.5 2.5,19.5"
+            stroke="url(#precision-brand-grad)"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <polygon
+            points="12,8.5 16.8,17.2 7.2,17.2"
+            fill="url(#precision-brand-grad)"
+            fillOpacity="0.88"
+          />
+          <circle cx="12" cy="14.5" r="1.5" fill="#f59e0b" />
+        </svg>
+      </span>
+      <span className="font-display text-[15px] font-bold tracking-[-0.01em] text-[var(--text-primary)] group-hover:text-[var(--brand-primary-text)] transition-colors duration-150 whitespace-nowrap">
         Mantenimiento
       </span>
     </button>

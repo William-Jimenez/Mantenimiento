@@ -1,14 +1,19 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { Check, FileText, Search, Upload, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
+  AlertBanner,
   EmptyState,
   FieldError,
   FieldLabel,
+  FilterChip,
   GhostButton,
   inputBaseClass,
   ModalDialog,
   OutlineButton,
+  PageHeader,
   PrimaryButton,
+  SurfaceCard,
 } from '../components/CommonUI';
 import {
   formatearTamano,
@@ -18,7 +23,6 @@ import {
   validarArchivoEvidencia,
 } from '../services/domainRules';
 import { ErrorScreen } from './ErrorScreen';
-import { FileText, Upload, X } from 'lucide-react';
 
 interface PendingFile {
   id: string;
@@ -41,7 +45,9 @@ export function NewRequestScreen() {
     navigate,
   } = useApp();
 
-  const submissionTokenRef = useRef<string>(`sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const submissionTokenRef = useRef<string>(
+    `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  );
 
   if (!puedeCrearSolicitud(currentUser)) {
     return <ErrorScreen tipo="sin-permiso" />;
@@ -204,7 +210,9 @@ export function NewRequestScreen() {
         if (res.campo) {
           setErroresCampo({ [res.campo]: res.error ?? 'Dato inválido.' });
         } else {
-          setErroresCampo({ general: res.error ?? 'No pudimos registrar la solicitud. Intente de nuevo.' });
+          setErroresCampo({
+            general: res.error ?? 'No pudimos registrar la solicitud. Intente de nuevo.',
+          });
         }
         return;
       }
@@ -215,29 +223,27 @@ export function NewRequestScreen() {
 
   const fotosActuales = archivos.filter((a) => a.tipo === 'FOTOGRAFIA').length;
   const pdfsActuales = archivos.filter((a) => a.tipo === 'PDF').length;
+  const descLen = descripcion.trim().length;
 
   return (
-    <section className="max-w-[880px] space-y-[36px]">
-      <div className="space-y-[12px]">
-        <GhostButton onClick={handleCancelClick}>← Volver al inicio</GhostButton>
-        <p className="nav-label text-saffron-spark">M3 · Registro de solicitud</p>
-        <h1 className="text-[42px] sm:text-[56px] leading-[1.08] tracking-[-1.68px] text-bone-white">
-          Nueva solicitud de mantenimiento
-        </h1>
-        <p className="body-ultralight text-silver-mist max-w-[600px]">
-          {isAdmin
+    <section className="max-w-[900px] space-y-7">
+      <PageHeader
+        backAction={
+          <GhostButton onClick={handleCancelClick} className="-ml-2.5">
+            ← Volver al inicio
+          </GhostButton>
+        }
+        eyebrow="M3 · Registro de solicitud"
+        title="Nueva solicitud de mantenimiento"
+        description={
+          isAdmin
             ? 'Registre una solicitud propia o en nombre de un empleado activo adjuntando la evidencia disponible.'
-            : 'Seleccione el recurso afectado, describa el daño y adjunte fotografías o documentos PDF si cuenta con ellos.'}
-        </p>
-      </div>
+            : 'Seleccione el recurso afectado, describa el daño y adjunte fotografías o documentos PDF si cuenta con ellos.'
+        }
+      />
 
       {erroresCampo.general && (
-        <div
-          role="alert"
-          className="border border-saffron-spark/70 rounded-[12px] px-[16px] py-[12px] text-[14px] text-saffron-spark"
-        >
-          {erroresCampo.general}
-        </div>
+        <AlertBanner variant="error">{erroresCampo.general}</AlertBanner>
       )}
 
       {recursosActivos.length === 0 ? (
@@ -257,33 +263,42 @@ export function NewRequestScreen() {
           }
         />
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-[36px]" noValidate>
+        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
           {/* Step 1 (Admin only, RC-03): Solicitante */}
           {isAdmin && (
-            <div className="space-y-[12px] pb-[24px] border-b border-white/12">
+            <SurfaceCard className="space-y-4">
               <FieldLabel htmlFor="solicitante-buscar" required>
                 Empleado solicitante
               </FieldLabel>
-              <input
-                id="solicitante-buscar"
-                type="search"
-                value={solicitanteQuery}
-                onChange={(e) => setSolicitanteQuery(e.target.value)}
-                placeholder="Buscar por nombre, documento o correo…"
-                className={inputBaseClass}
-              />
+
+              <div className="relative">
+                <Search
+                  className="w-4 h-4 text-[var(--text-muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                  aria-hidden="true"
+                />
+                <input
+                  id="solicitante-buscar"
+                  type="search"
+                  value={solicitanteQuery}
+                  onChange={(e) => setSolicitanteQuery(e.target.value)}
+                  placeholder="Buscar por nombre, documento o correo…"
+                  className={`${inputBaseClass} pl-10`}
+                />
+              </div>
 
               {empleadosFiltrados.length === 0 ? (
-                <div className="pt-[6px] text-[14px] text-saffron-spark flex flex-wrap items-center gap-[12px]">
-                  <span>No hay empleados activos con ese criterio.</span>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/admin/empleados/nuevo')}
-                    className="underline text-bone-white cursor-pointer"
-                  >
-                    Registrar empleado
-                  </button>
-                </div>
+                <AlertBanner variant="warning">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span>No hay empleados activos con ese criterio.</span>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/admin/empleados/nuevo')}
+                      className="underline font-semibold text-[var(--text-primary)] cursor-pointer"
+                    >
+                      Registrar empleado
+                    </button>
+                  </div>
+                </AlertBanner>
               ) : (
                 <select
                   aria-label="Seleccionar empleado solicitante"
@@ -300,55 +315,48 @@ export function NewRequestScreen() {
                 </select>
               )}
               <FieldError message={erroresCampo.solicitanteId} />
-            </div>
+            </SurfaceCard>
           )}
 
           {/* Step 2: Recurso activo con filtro por tipo */}
-          <div className="space-y-[12px] pb-[24px] border-b border-white/12">
+          <SurfaceCard className="space-y-4">
             <FieldLabel htmlFor="recurso-buscar" required>
               Recurso afectado
             </FieldLabel>
 
-            <div className="flex flex-wrap items-center gap-[8px]">
-              <button
-                type="button"
-                onClick={() => setTipoFiltro(0)}
-                className={`px-[12px] py-[6px] rounded-[24px] text-[13px] cursor-pointer transition-colors ${
-                  tipoFiltro === 0
-                    ? 'bg-electric-iris text-bone-white'
-                    : 'text-ash-gray hover:text-bone-white border border-white/15'
-                }`}
-              >
+            <div className="flex flex-wrap items-center gap-2">
+              <FilterChip active={tipoFiltro === 0} onClick={() => setTipoFiltro(0)}>
                 Todos los tipos
-              </button>
+              </FilterChip>
               {tiposRecurso.map((t) => (
-                <button
+                <FilterChip
                   key={t.id}
-                  type="button"
+                  active={tipoFiltro === t.id}
                   onClick={() => setTipoFiltro(t.id)}
-                  className={`px-[12px] py-[6px] rounded-[24px] text-[13px] cursor-pointer transition-colors ${
-                    tipoFiltro === t.id
-                      ? 'bg-electric-iris text-bone-white'
-                      : 'text-ash-gray hover:text-bone-white border border-white/15'
-                  }`}
                 >
                   {t.nombre}
-                </button>
+                </FilterChip>
               ))}
             </div>
 
-            <input
-              id="recurso-buscar"
-              type="search"
-              value={recursoQuery}
-              onChange={(e) => setRecursoQuery(e.target.value)}
-              placeholder="Buscar recurso por código, nombre o ubicación…"
-              className={inputBaseClass}
-            />
+            <div className="relative">
+              <Search
+                className="w-4 h-4 text-[var(--text-muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
+              <input
+                id="recurso-buscar"
+                type="search"
+                value={recursoQuery}
+                onChange={(e) => setRecursoQuery(e.target.value)}
+                placeholder="Buscar recurso por código, nombre o ubicación…"
+                className={`${inputBaseClass} pl-10`}
+              />
+            </div>
 
-            <div className="max-h-[240px] overflow-y-auto border border-white/15 rounded-[12px] divide-y divide-white/10">
+            <div className="max-h-[260px] overflow-y-auto border border-[var(--border-default)] rounded-[12px] bg-[var(--bg-canvas)]/60 divide-y divide-[var(--border-subtle)]">
               {recursosFiltrados.length === 0 ? (
-                <p className="p-[16px] text-[14px] text-ash-gray">
+                <p className="p-4 text-[14px] text-[var(--text-muted)]">
                   No hay recursos activos que coincidan con la búsqueda.
                 </p>
               ) : (
@@ -359,21 +367,36 @@ export function NewRequestScreen() {
                     <button
                       key={rec.id}
                       type="button"
+                      aria-pressed={selected}
                       onClick={() => {
                         setRecursoId(rec.id);
                         setErroresCampo((prev) => ({ ...prev, recursoId: '' }));
                       }}
-                      className={`w-full text-left px-[16px] py-[12px] flex flex-col sm:flex-row sm:items-center justify-between gap-[6px] cursor-pointer transition-colors ${
-                        selected ? 'bg-electric-iris/20' : 'hover:bg-white/[0.04]'
+                      className={`w-full text-left px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 cursor-pointer transition-colors duration-150 ${
+                        selected
+                          ? 'bg-[var(--brand-primary-soft)]'
+                          : 'hover:bg-[var(--bg-subtle)]/70'
                       }`}
                     >
-                      <div>
-                        <span className="tabular-nums text-[13px] text-saffron-spark mr-[10px]">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          aria-hidden="true"
+                          className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                            selected
+                              ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] text-white'
+                              : 'border-[var(--border-strong)] bg-[var(--bg-surface)]'
+                          }`}
+                        >
+                          {selected && <Check className="w-3 h-3" />}
+                        </span>
+                        <span className="font-mono-code text-[12px] font-semibold px-2 py-0.5 rounded-[6px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--status-warning-text)] shrink-0">
                           {rec.codigo}
                         </span>
-                        <span className="text-[15px] text-bone-white">{rec.nombre}</span>
+                        <span className="text-[14px] font-semibold text-[var(--text-primary)] truncate">
+                          {rec.nombre}
+                        </span>
                       </div>
-                      <span className="text-[13px] text-ash-gray">
+                      <span className="text-[12px] text-[var(--text-muted)] pl-7 sm:pl-0 shrink-0">
                         {tipo?.nombre} · {rec.ubicacion}
                       </span>
                     </button>
@@ -382,20 +405,22 @@ export function NewRequestScreen() {
               )}
             </div>
             <FieldError message={erroresCampo.recursoId} />
-          </div>
+          </SurfaceCard>
 
           {/* Step 3: Descripción */}
-          <div className="space-y-[8px] pb-[24px] border-b border-white/12">
-            <div className="flex items-center justify-between">
+          <SurfaceCard className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <FieldLabel htmlFor="solicitud-desc" required>
                 Descripción del problema
               </FieldLabel>
               <span
-                className={`text-[13px] tabular-nums ${
-                  descripcion.trim().length < 20 ? 'text-ash-gray' : 'text-deep-verdant'
+                className={`text-[12px] font-mono-code font-medium px-2.5 py-0.5 rounded-[6px] border ${
+                  descLen < 20
+                    ? 'bg-[var(--bg-subtle)] border-[var(--border-subtle)] text-[var(--text-muted)]'
+                    : 'bg-[var(--status-success-soft)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
                 }`}
               >
-                {descripcion.trim().length} / 2000 caracteres (mín. 20)
+                {descLen} / 2000 caracteres (mín. 20)
               </span>
             </div>
             <textarea
@@ -413,16 +438,15 @@ export function NewRequestScreen() {
               className={inputBaseClass}
             />
             <FieldError message={erroresCampo.descripcion} />
-          </div>
+          </SurfaceCard>
 
           {/* Step 4: Evidencias */}
-          <div className="space-y-[18px]">
+          <SurfaceCard className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <FieldLabel htmlFor="evidencias-input">
-                Evidencias (opcional)
-              </FieldLabel>
-              <span className="text-[13px] tabular-nums text-ash-gray">
-                Fotos: {fotosActuales}/{MAX_FOTOS} (JPEG/PNG, máx. 5 MB) · PDF: {pdfsActuales}/{MAX_PDFS} (máx. 10 MB)
+              <FieldLabel htmlFor="evidencias-input">Evidencias (opcional)</FieldLabel>
+              <span className="text-[12px] font-mono-code text-[var(--text-muted)]">
+                Fotos: {fotosActuales}/{MAX_FOTOS} (JPEG/PNG, máx. 5 MB) · PDF: {pdfsActuales}/
+                {MAX_PDFS} (máx. 10 MB)
               </span>
             </div>
 
@@ -446,17 +470,19 @@ export function NewRequestScreen() {
                   void handleFilesSelected(e.dataTransfer.files);
                 }
               }}
-              className={`flex flex-col items-center justify-center gap-[10px] border border-dashed rounded-[24px] p-[24px] cursor-pointer transition-colors text-center ${
+              className={`flex flex-col items-center justify-center gap-2.5 border-2 border-dashed rounded-[14px] p-7 cursor-pointer transition-[border-color,background-color] duration-150 text-center ${
                 isDragging
-                  ? 'border-electric-iris bg-electric-iris/10'
-                  : 'border-white/25 hover:border-electric-iris'
+                  ? 'border-[var(--brand-primary)] bg-[var(--brand-primary-soft)]'
+                  : 'border-[var(--border-default)] bg-[var(--bg-canvas)]/50 hover:border-[var(--brand-primary-text)] hover:bg-[var(--bg-subtle)]/40'
               }`}
             >
-              <Upload className="w-6 h-6 text-electric-iris" aria-hidden="true" />
-              <span className="text-[15px] text-bone-white">
+              <span className="w-11 h-11 rounded-[12px] bg-[var(--brand-primary-soft)] border border-[var(--brand-primary-border)] flex items-center justify-center text-[var(--brand-primary-text)]">
+                <Upload className="w-5 h-5" aria-hidden="true" />
+              </span>
+              <span className="text-[15px] font-semibold text-[var(--text-primary)]">
                 Arrastre y suelte o seleccione fotografías y documentos PDF
               </span>
-              <span className="text-[13px] text-ash-gray">
+              <span className="text-[13px] text-[var(--text-muted)] max-w-[440px]">
                 Validación automática de firma binaria (JPEG, PNG, PDF) y hash SHA-256 de integridad.
               </span>
               <input
@@ -475,13 +501,13 @@ export function NewRequestScreen() {
             <FieldError message={archivoError} />
 
             {archivos.length > 0 && (
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-[12px]">
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 list-none p-0">
                 {archivos.map((arc) => (
                   <li
                     key={arc.id}
-                    className="border border-white/15 rounded-[12px] p-[12px] flex items-center justify-between gap-[12px]"
+                    className="border border-[var(--border-default)] bg-[var(--bg-canvas)]/60 rounded-[12px] p-3 flex items-center justify-between gap-3"
                   >
-                    <div className="flex items-center gap-[12px] min-w-0">
+                    <div className="flex items-center gap-3 min-w-0">
                       {arc.tipo === 'FOTOGRAFIA' ? (
                         <img
                           src={arc.dataUrl}
@@ -489,15 +515,18 @@ export function NewRequestScreen() {
                           className="w-12 h-12 object-cover rounded-[8px] shrink-0"
                         />
                       ) : (
-                        <div className="w-12 h-12 rounded-[8px] border border-white/15 flex items-center justify-center shrink-0">
-                          <FileText className="w-5 h-5 text-saffron-spark" />
+                        <div className="w-12 h-12 rounded-[8px] border border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] flex items-center justify-center shrink-0">
+                          <FileText
+                            className="w-5 h-5 text-[var(--status-warning-text)]"
+                            aria-hidden="true"
+                          />
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className="text-[14px] text-bone-white truncate">
+                        <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">
                           {arc.nombreOriginal}
                         </p>
-                        <p className="text-[12px] tabular-nums text-ash-gray">
+                        <p className="text-[12px] font-mono-code text-[var(--text-muted)]">
                           {arc.tipo} · {formatearTamano(arc.tamanoBytes)}
                         </p>
                       </div>
@@ -508,18 +537,18 @@ export function NewRequestScreen() {
                       onClick={() =>
                         setArchivos((prev) => prev.filter((item) => item.id !== arc.id))
                       }
-                      className="text-ash-gray hover:text-bone-white p-2 cursor-pointer"
+                      className="text-[var(--text-muted)] hover:text-[var(--status-danger-text)] hover:bg-[var(--status-danger-soft)] p-2 rounded-[8px] transition-colors cursor-pointer shrink-0"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
+          </SurfaceCard>
 
-          <div className="flex flex-wrap items-center gap-[18px] pt-[12px]">
-            <PrimaryButton type="submit" disabled={submitting}>
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <PrimaryButton type="submit" loading={submitting}>
               {submitting ? 'Enviando…' : 'Enviar solicitud'}
             </PrimaryButton>
             <OutlineButton onClick={handleCancelClick} disabled={submitting}>
@@ -535,10 +564,10 @@ export function NewRequestScreen() {
         title="¿Descartar la solicitud?"
         onClose={() => setConfirmDiscardOpen(false)}
       >
-        <p className="body-ultralight text-silver-mist mb-[24px]">
+        <p className="body-readable text-[var(--text-secondary)] mb-6">
           Se perderán los datos ingresados y los archivos seleccionados.
         </p>
-        <div className="flex flex-wrap items-center gap-[18px]">
+        <div className="flex flex-wrap items-center gap-3">
           <PrimaryButton onClick={() => navigate('/')}>Descartar</PrimaryButton>
           <OutlineButton onClick={() => setConfirmDiscardOpen(false)}>
             Seguir editando

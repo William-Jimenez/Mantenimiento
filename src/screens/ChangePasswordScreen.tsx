@@ -12,12 +12,14 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
+  AlertBanner,
   FieldError,
   FieldLabel,
   GhostButton,
   inputBaseClass,
   OutlineButton,
   PrimaryButton,
+  SurfaceCard,
 } from '../components/CommonUI';
 import { LogoLockup } from '../components/ConstellationCanvas';
 import { ThemeLanguageControls } from '../components/ThemeLanguageControls';
@@ -75,7 +77,6 @@ export function ChangePasswordScreen() {
     /[A-ZÁÉÍÓÚÑ]/.test(nueva) && /[a-záéíóúñ]/.test(nueva) && (/[^A-Za-z0-9]/.test(nueva) || nueva.length >= 12);
   const coincidenPasswords = nueva.length > 0 && nueva === confirmacion;
 
-  // Cálculo de fortaleza de la contraseña (0 a 4)
   const strengthScore =
     (cumpleLongitud ? 1 : 0) +
     (cumpleLetra ? 1 : 0) +
@@ -84,16 +85,15 @@ export function ChangePasswordScreen() {
 
   const strengthInfo =
     nueva.length === 0
-      ? { label: 'Sin ingresar', color: 'text-ash-gray', barColor: 'bg-white/15' }
+      ? { label: 'Sin ingresar', color: 'text-[var(--text-muted)]', barColor: 'bg-[var(--border-default)]' }
       : strengthScore <= 1
-      ? { label: 'Débil', color: 'text-saffron-spark', barColor: 'bg-saffron-spark' }
+      ? { label: 'Débil', color: 'text-[var(--status-danger-text)]', barColor: 'bg-[var(--status-danger)]' }
       : strengthScore === 2
-      ? { label: 'Regular', color: 'text-saffron-spark', barColor: 'bg-saffron-spark' }
+      ? { label: 'Regular', color: 'text-[var(--status-warning-text)]', barColor: 'bg-[var(--brand-accent)]' }
       : strengthScore === 3
-      ? { label: 'Buena (Cumple política)', color: 'text-electric-iris', barColor: 'bg-electric-iris' }
-      : { label: 'Fuerte', color: 'text-deep-verdant', barColor: 'bg-deep-verdant' };
+      ? { label: 'Buena (Cumple política)', color: 'text-[var(--brand-primary-text)]', barColor: 'bg-[var(--brand-primary)]' }
+      : { label: 'Fuerte', color: 'text-[var(--status-success-text)]', barColor: 'bg-[var(--status-success)]' };
 
-  // Paso 1: Verificar correo electrónico y enviar código
   const handleSendCode = (e: React.FormEvent) => {
     e.preventDefault();
     setFieldError(null);
@@ -114,7 +114,6 @@ export function ChangePasswordScreen() {
     setStep('code');
   };
 
-  // Reenviar código con temporizador anti-abuso
   const handleResendCode = () => {
     if (resendCooldown > 0) return;
     setFieldError(null);
@@ -132,7 +131,6 @@ export function ChangePasswordScreen() {
     setResendNotice('Se ha enviado un nuevo código de verificación de 6 dígitos a su correo.');
   };
 
-  // Paso 2: Validar el código de verificación de 6 dígitos
   const handleVerifyCode = (e: React.FormEvent) => {
     e.preventDefault();
     setFieldError(null);
@@ -150,7 +148,6 @@ export function ChangePasswordScreen() {
     setStep('password');
   };
 
-  // Paso 3: Establecer la nueva contraseña
   const handleResetPassword = (e: React.FormEvent) => {
     e.preventDefault();
     setFieldError(null);
@@ -197,520 +194,499 @@ export function ChangePasswordScreen() {
   return (
     <div
       data-testid="pantalla-cambio-contrasena"
-      className="min-h-screen bg-void text-bone-white flex flex-col justify-between px-[18px] sm:px-[30px] py-[30px]"
+      className="technical-grid-bg min-h-screen bg-[var(--bg-canvas)] text-[var(--text-primary)] flex flex-col justify-between"
     >
       {/* Top Bar */}
-      <div className="max-w-[1280px] w-full mx-auto flex flex-wrap items-center justify-between gap-4">
-        <LogoLockup onClick={handleVolver} />
-        <div className="flex flex-wrap items-center gap-[12px]">
-          <ThemeLanguageControls />
-          {currentUser ? (
-            <GhostButton onClick={() => logout()}>Cerrar sesión</GhostButton>
-          ) : (
-            <GhostButton onClick={() => navigate('/login')}>
-              <span className="inline-flex items-center gap-[6px]">
-                <ArrowLeft className="w-[14px] h-[14px]" aria-hidden="true" />
-                <span>Volver al inicio de sesión</span>
-              </span>
-            </GhostButton>
-          )}
+      <header className="w-full border-b border-[var(--border-subtle)] bg-[var(--bg-header)] backdrop-blur-md">
+        <div className="max-w-[1280px] w-full mx-auto px-4 sm:px-6 lg:px-8 h-[68px] flex items-center justify-between gap-4">
+          <LogoLockup onClick={handleVolver} />
+          <div className="flex items-center gap-2.5">
+            <ThemeLanguageControls />
+            {currentUser ? (
+              <GhostButton onClick={() => logout()}>Cerrar sesión</GhostButton>
+            ) : (
+              <GhostButton onClick={() => navigate('/login')}>
+                <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Volver al inicio de sesión</span>
+              </GhostButton>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="max-w-[560px] w-full mx-auto py-[32px] sm:py-[44px] space-y-[28px]">
-        {/* Stepper de 4 etapas para el proceso de recuperación en dos pasos */}
-        {isRecoveryMode && (
-          <nav
-            aria-label="Progreso de restablecimiento de contraseña"
-            className="grid grid-cols-4 gap-[8px] pb-[18px] border-b border-white/12"
-          >
-            {stepsMeta.map((s, idx) => {
-              const isCompleted = idx < currentStepIdx || step === 'success';
-              const isCurrent = idx === currentStepIdx && step !== 'success';
-              return (
-                <div
-                  key={s.key}
-                  className={`flex flex-col gap-[6px] ${
-                    isCurrent
-                      ? 'text-bone-white'
-                      : isCompleted
-                      ? 'text-deep-verdant'
-                      : 'text-ash-gray'
-                  }`}
-                >
-                  <div
-                    className={`h-[3px] w-full rounded-full transition-colors ${
-                      isCompleted
-                        ? 'bg-deep-verdant'
-                        : isCurrent
-                        ? 'bg-electric-iris'
-                        : 'bg-white/12'
-                    }`}
-                  />
-                  <div className="flex items-center gap-[5px] text-[11px] sm:text-[12px] font-semibold uppercase tracking-[0.35px]">
-                    <span className="tabular-nums">{s.num}</span>
-                    <span className="truncate">{s.label}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </nav>
-        )}
-
-        {/* Header Contextual por Paso */}
-        <div className="space-y-[12px]">
-          <div className="inline-flex items-center gap-[8px]">
-            <span
-              aria-hidden="true"
-              className="w-[28px] h-[28px] rounded-[8px] bg-saffron-spark/12 border border-saffron-spark/30 flex items-center justify-center text-saffron-spark"
+      {/* Centered Security Card */}
+      <main className="w-full max-w-[600px] mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <SurfaceCard className="space-y-6">
+          {/* 4-Step Recovery Progress Stepper */}
+          {isRecoveryMode && (
+            <nav
+              aria-label="Progreso de restablecimiento de contraseña"
+              className="grid grid-cols-4 gap-2 pb-5 border-b border-[var(--border-subtle)]"
             >
-              <KeyRound className="w-[14px] h-[14px]" />
-            </span>
-            <p className="nav-label text-saffron-spark">
+              {stepsMeta.map((s, idx) => {
+                const isCompleted = idx < currentStepIdx || step === 'success';
+                const isCurrent = idx === currentStepIdx && step !== 'success';
+                return (
+                  <div
+                    key={s.key}
+                    className={`flex flex-col gap-1.5 ${
+                      isCurrent
+                        ? 'text-[var(--text-primary)]'
+                        : isCompleted
+                        ? 'text-[var(--status-success-text)]'
+                        : 'text-[var(--text-muted)]'
+                    }`}
+                  >
+                    <div
+                      className={`h-1 w-full rounded-full transition-colors ${
+                        isCompleted
+                          ? 'bg-[var(--status-success-text)]'
+                          : isCurrent
+                          ? 'bg-[var(--brand-primary)]'
+                          : 'bg-[var(--border-default)]'
+                      }`}
+                    />
+                    <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.04em]">
+                      <span className="font-mono-code">{s.num}</span>
+                      <span className="truncate">{s.label}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </nav>
+          )}
+
+          {/* Contextual Header */}
+          <div className="space-y-2.5">
+            <div className="inline-flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="w-7 h-7 rounded-[8px] bg-[var(--brand-primary-soft)] border border-[var(--brand-primary-border)] flex items-center justify-center text-[var(--brand-primary-text)]"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+              </span>
+              <p className="nav-label text-[var(--brand-primary-text)]">
+                {!isRecoveryMode
+                  ? 'Cambio obligatorio · Primer acceso'
+                  : step === 'email'
+                  ? 'Paso 1 de 3 · Verificación de Correo Electrónico'
+                  : step === 'code'
+                  ? 'Paso 2 de 3 · Validación de Código de Seguridad'
+                  : step === 'password'
+                  ? 'Paso 3 de 3 · Establecimiento de Nueva Contraseña'
+                  : 'Proceso Completado · Cuenta Recuperada'}
+              </p>
+            </div>
+
+            <h1 className="text-[26px] sm:text-[32px] leading-[1.12] tracking-[-0.025em] font-bold text-[var(--text-primary)]">
               {!isRecoveryMode
-                ? 'Cambio obligatorio · Primer acceso'
+                ? 'Defina su nueva contraseña.'
                 : step === 'email'
-                ? 'Paso 1 de 3 · Verificación de Correo Electrónico'
+                ? 'Restablezca su contraseña.'
                 : step === 'code'
-                ? 'Paso 2 de 3 · Validación de Código de Seguridad'
+                ? 'Ingrese el código de verificación.'
                 : step === 'password'
-                ? 'Paso 3 de 3 · Establecimiento de Nueva Contraseña'
-                : 'Proceso Completado · Cuenta Recuperada'}
+                ? 'Cree su nueva contraseña.'
+                : 'Contraseña actualizada.'}
+            </h1>
+
+            <p className="body-readable text-[var(--text-secondary)]">
+              {!isRecoveryMode
+                ? `${
+                    currentEmpleado ? `${currentEmpleado.nombres}, está` : 'Está'
+                  } ingresando con una contraseña temporal. Debe establecer una contraseña personal de al menos 10 caracteres que incluya letras y números antes de continuar.`
+                : step === 'email'
+                ? 'Introduzca el correo electrónico asociado a su cuenta. Verificaremos su registro y le enviaremos un código de seguridad de 6 dígitos.'
+                : step === 'code'
+                ? `Hemos enviado un código de verificación de un solo uso (6 dígitos) al correo electrónico ${correo}. El código expira en 10 minutos.`
+                : step === 'password'
+                ? 'Su identidad ha sido verificada. Establezca ahora una contraseña segura que cumpla con todos los requisitos de protección.'
+                : 'Su credencial de acceso ha sido actualizada y cifrada correctamente en el sistema.'}
             </p>
           </div>
 
-          <h1 className="text-[34px] sm:text-[44px] leading-[1.08] tracking-[-1.68px] text-bone-white">
-            {!isRecoveryMode
-              ? 'Defina su nueva contraseña.'
-              : step === 'email'
-              ? 'Restablezca su contraseña.'
-              : step === 'code'
-              ? 'Ingrese el código de verificación.'
-              : step === 'password'
-              ? 'Cree su nueva contraseña.'
-              : 'Contraseña actualizada.'}
-          </h1>
+          {/* PASO 1: CORREO ELECTRÓNICO */}
+          {isRecoveryMode && step === 'email' && (
+            <form
+              onSubmit={handleSendCode}
+              data-testid="form-paso-correo"
+              className="space-y-5"
+              noValidate
+            >
+              <div>
+                <FieldLabel htmlFor="recovery-correo" required>
+                  Correo Electrónico
+                </FieldLabel>
+                <input
+                  id="recovery-correo"
+                  name="correo"
+                  type="email"
+                  autoComplete="email"
+                  spellCheck={false}
+                  autoCapitalize="none"
+                  value={correo}
+                  onChange={(e) => {
+                    setCorreo(e.target.value);
+                    setFieldError(null);
+                  }}
+                  placeholder="nombre@empresa.com"
+                  className={inputBaseClass}
+                />
+                <FieldError message={fieldError?.mensaje} />
+              </div>
 
-          <p className="body-ultralight text-silver-mist">
-            {!isRecoveryMode
-              ? `${
-                  currentEmpleado ? `${currentEmpleado.nombres}, está` : 'Está'
-                } ingresando con una contraseña temporal. Debe establecer una contraseña personal de al menos 10 caracteres que incluya letras y números antes de continuar.`
-              : step === 'email'
-              ? 'Introduzca el correo electrónico asociado a su cuenta. Verificaremos su registro y le enviaremos un código de seguridad de 6 dígitos.'
-              : step === 'code'
-              ? `Hemos enviado un código de verificación de un solo uso (6 dígitos) al correo electrónico ${correo}. El código expira en 10 minutos.`
-              : step === 'password'
-              ? 'Su identidad ha sido verificada. Establezca ahora una contraseña segura que cumpla con todos los requisitos de protección.'
-              : 'Su credencial de acceso ha sido actualizada y cifrada correctamente en el sistema.'}
-          </p>
-        </div>
+              {fieldError?.campo === 'correo' && (
+                <div
+                  role="status"
+                  data-testid="alerta-correo-no-registrado"
+                  className="rounded-[12px] border border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] p-4 space-y-2"
+                >
+                  <p className="text-[14px] text-[var(--text-primary)] font-semibold">
+                    ¿Aún no tiene una cuenta activa en la plataforma?
+                  </p>
+                  <p className="text-[13px] text-[var(--text-secondary)] leading-[1.5]">
+                    Verifique que el correo esté bien escrito. Si es un nuevo usuario, puede registrarse directamente o contactar a soporte técnico / Administrador.
+                  </p>
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => navigate('/registro')}
+                      className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--brand-primary-text)] hover:underline underline-offset-4 cursor-pointer"
+                    >
+                      <UserPlus className="w-4 h-4" aria-hidden="true" />
+                      <span>Ir a crear cuenta</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
-        {/* ====================================================================
-            PASO 1: INTRODUCCIÓN Y VERIFICACIÓN DE CORREO ELECTRÓNICO
-           ==================================================================== */}
-        {isRecoveryMode && step === 'email' && (
-          <form
-            onSubmit={handleSendCode}
-            data-testid="form-paso-correo"
-            className="space-y-[20px]"
-            noValidate
-          >
-            <div>
-              <FieldLabel htmlFor="recovery-correo" required>
-                Correo Electrónico
-              </FieldLabel>
-              <input
-                id="recovery-correo"
-                name="correo"
-                type="email"
-                autoComplete="email"
-                spellCheck={false}
-                autoCapitalize="none"
-                value={correo}
-                onChange={(e) => {
-                  setCorreo(e.target.value);
-                  setFieldError(null);
-                }}
-                placeholder="nombre@empresa.com"
-                className={inputBaseClass}
-              />
-              <FieldError message={fieldError?.mensaje} />
-            </div>
+              <div className="pt-1 flex flex-wrap items-center gap-3">
+                <PrimaryButton type="submit" data-testid="btn-enviar-codigo">
+                  Enviar Código
+                </PrimaryButton>
+                <OutlineButton type="button" onClick={() => navigate('/login')}>
+                  Cancelar
+                </OutlineButton>
+              </div>
+            </form>
+          )}
 
-            {/* Si el correo no existe: sugerencia amigable para registrarse o contactar soporte */}
-            {fieldError?.campo === 'correo' && (
+          {/* PASO 2: CÓDIGO DE 6 DÍGITOS */}
+          {isRecoveryMode && step === 'code' && (
+            <form
+              onSubmit={handleVerifyCode}
+              data-testid="form-paso-codigo"
+              className="space-y-5"
+              noValidate
+            >
               <div
                 role="status"
-                data-testid="alerta-correo-no-registrado"
-                className="rounded-[14px] border border-saffron-spark/40 bg-white/[0.03] p-[16px] space-y-[10px]"
+                className="rounded-[12px] border border-[var(--brand-primary-border)] bg-[var(--brand-primary-soft)] p-4 space-y-3"
               >
-                <p className="text-[14px] text-bone-white font-medium">
-                  ¿Aún no tiene una cuenta activa en la plataforma?
-                </p>
-                <p className="text-[13px] text-silver-mist leading-[1.45]">
-                  Verifique que el correo esté bien escrito. Si es un nuevo usuario, puede registrarse directamente o contactar a soporte técnico / Administrador.
-                </p>
-                <div className="flex flex-wrap items-center gap-[12px] pt-[4px]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Mail
+                      className="w-[18px] h-[18px] text-[var(--brand-primary-text)] shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span className="text-[14px] font-medium text-[var(--text-primary)] truncate">
+                      Código enviado a{' '}
+                      <strong className="font-semibold text-[var(--brand-primary-text)]">
+                        {correo}
+                      </strong>
+                    </span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => navigate('/registro')}
-                    className="inline-flex items-center gap-[6px] text-[13px] font-semibold text-saffron-spark hover:text-bone-white underline underline-offset-4 cursor-pointer"
+                    onClick={() => {
+                      setFieldError(null);
+                      setStep('email');
+                    }}
+                    className="text-[12px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline underline-offset-4 cursor-pointer shrink-0"
                   >
-                    <UserPlus className="w-[14px] h-[14px]" aria-hidden="true" />
-                    <span>Ir a crear cuenta</span>
+                    Cambiar correo
                   </button>
                 </div>
+
+                {codigoSimulado && (
+                  <div className="pt-2.5 border-t border-[var(--brand-primary-border)] flex flex-wrap items-center justify-between gap-2.5 text-[13px]">
+                    <span className="text-[var(--text-secondary)]">
+                      Bandeja local de demostración · Código OTP:{' '}
+                      <strong
+                        data-testid="codigo-otp-generado"
+                        className="text-[var(--status-warning-text)] font-mono-code text-[15px] tracking-[2px]"
+                      >
+                        {codigoSimulado}
+                      </strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCodigo(codigoSimulado);
+                        setFieldError(null);
+                      }}
+                      className="px-2.5 py-1 rounded-[6px] bg-[var(--brand-primary)] text-white text-[12px] font-semibold hover:bg-[var(--brand-primary-hover)] transition-colors cursor-pointer"
+                    >
+                      Usar código
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
 
-            <div className="pt-[6px] flex flex-wrap items-center gap-[14px]">
-              <PrimaryButton type="submit" data-testid="btn-enviar-codigo">
-                Enviar Código
-              </PrimaryButton>
-              <OutlineButton type="button" onClick={() => navigate('/login')}>
-                Cancelar
-              </OutlineButton>
-            </div>
-          </form>
-        )}
+              {resendNotice && <AlertBanner variant="success">{resendNotice}</AlertBanner>}
 
-        {/* ====================================================================
-            PASO 2: INTRODUCCIÓN Y VALIDACIÓN DEL CÓDIGO DE 6 DÍGITOS
-           ==================================================================== */}
-        {isRecoveryMode && step === 'code' && (
-          <form
-            onSubmit={handleVerifyCode}
-            data-testid="form-paso-codigo"
-            className="space-y-[20px]"
-            noValidate
-          >
-            {/* Notificación de envío de código + código simulado para pruebas locales */}
-            <div
-              role="status"
-              className="rounded-[14px] border border-electric-iris/45 bg-white/[0.03] p-[16px] space-y-[10px]"
-            >
-              <div className="flex items-start justify-between gap-[12px]">
-                <div className="flex items-center gap-[10px]">
-                  <Mail className="w-[18px] h-[18px] text-electric-iris shrink-0" aria-hidden="true" />
-                  <span className="text-[14px] font-medium text-bone-white">
-                    Código enviado a <span className="text-saffron-spark">{correo}</span>
-                  </span>
-                </div>
+              <div>
+                <FieldLabel htmlFor="recovery-codigo" required>
+                  Código de Verificación (6 dígitos)
+                </FieldLabel>
+                <input
+                  id="recovery-codigo"
+                  name="codigo"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  value={codigo}
+                  onChange={(e) => {
+                    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setCodigo(digitsOnly);
+                    setFieldError(null);
+                  }}
+                  placeholder="Ej. 482910"
+                  className={`${inputBaseClass} font-mono-code tracking-[0.35em] text-[20px] font-semibold`}
+                />
+                <FieldError message={fieldError?.mensaje} />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 text-[13px]">
+                <span className="text-[var(--text-muted)]">¿No recibió el código en su bandeja?</span>
                 <button
+                  type="button"
+                  data-testid="btn-reenviar-codigo"
+                  disabled={resendCooldown > 0}
+                  onClick={handleResendCode}
+                  className={`inline-flex items-center gap-1.5 font-semibold transition-colors ${
+                    resendCooldown > 0
+                      ? 'text-[var(--text-muted)] cursor-not-allowed opacity-60'
+                      : 'text-[var(--brand-primary-text)] hover:underline underline-offset-4 cursor-pointer'
+                  }`}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span className="tabular-nums">
+                    {resendCooldown > 0
+                      ? `Reenviar código en ${resendCooldown}s`
+                      : 'Reenviar nuevo código'}
+                  </span>
+                </button>
+              </div>
+
+              <div className="pt-1 flex flex-wrap items-center gap-3">
+                <PrimaryButton type="submit" data-testid="btn-verificar-codigo">
+                  Verificar Código
+                </PrimaryButton>
+                <OutlineButton
                   type="button"
                   onClick={() => {
                     setFieldError(null);
                     setStep('email');
                   }}
-                  className="text-[12px] text-silver-mist hover:text-bone-white underline cursor-pointer shrink-0"
                 >
-                  Cambiar correo
-                </button>
+                  Atrás
+                </OutlineButton>
               </div>
+            </form>
+          )}
 
-              {codigoSimulado && (
-                <div className="pt-[8px] border-t border-white/10 flex flex-wrap items-center justify-between gap-[10px] text-[13px]">
-                  <span className="text-silver-mist">
-                    Bandeja local de demostración · Código OTP:{' '}
-                    <strong
-                      data-testid="codigo-otp-generado"
-                      className="text-saffron-spark font-mono text-[15px] tracking-[2px]"
+          {/* PASO 3 (O P-02): NUEVA CONTRASEÑA */}
+          {(!isRecoveryMode || step === 'password') && (
+            <form
+              onSubmit={handleResetPassword}
+              data-testid="form-paso-password"
+              className="space-y-5"
+              noValidate
+            >
+              <div>
+                <FieldLabel htmlFor="new-pass" required>
+                  Nueva Contraseña
+                </FieldLabel>
+
+                {/* Password Strength Meter */}
+                <div className="mb-2.5 space-y-1.5">
+                  <div className="flex items-center justify-between text-[12px]">
+                    <span className="text-[var(--text-muted)]">Fortaleza de la contraseña:</span>
+                    <span
+                      data-testid="password-strength-label"
+                      className={`font-semibold ${strengthInfo.color}`}
                     >
-                      {codigoSimulado}
-                    </strong>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCodigo(codigoSimulado);
+                      {strengthInfo.label}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5" aria-hidden="true">
+                    {[1, 2, 3, 4].map((level) => (
+                      <div
+                        key={level}
+                        className={`h-1.5 rounded-full transition-colors duration-200 ${
+                          nueva.length > 0 && strengthScore >= level
+                            ? strengthInfo.barColor
+                            : 'bg-[var(--bg-subtle)]'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Security Policy Rules */}
+                <ul
+                  id="new-pass-rules"
+                  className="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-3.5 gap-y-1.5 text-[12px] text-[var(--text-secondary)] list-none p-0"
+                >
+                  {[
+                    { ok: cumpleLongitud, text: 'Mínimo 10 caracteres' },
+                    { ok: cumpleLetra, text: 'Al menos 1 letra' },
+                    { ok: cumpleNumero, text: 'Al menos 1 número' },
+                    { ok: coincidenPasswords, text: 'Confirmación coincidente' },
+                  ].map((rule) => (
+                    <li key={rule.text} className="inline-flex items-center gap-1.5">
+                      <CheckCircle2
+                        className={`w-3.5 h-3.5 shrink-0 ${
+                          rule.ok
+                            ? 'text-[var(--status-success-text)]'
+                            : 'text-[var(--text-muted)]'
+                        }`}
+                        aria-hidden="true"
+                      />
+                      <span>{rule.text}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="relative">
+                  <input
+                    id="new-pass"
+                    type={showNueva ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={nueva}
+                    onChange={(e) => {
+                      setNueva(e.target.value);
                       setFieldError(null);
                     }}
-                    className="text-electric-iris hover:underline font-medium cursor-pointer"
+                    placeholder="Mínimo 10 caracteres, letra y número"
+                    className={`${inputBaseClass} pr-11`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNueva((prev) => !prev)}
+                    aria-label={showNueva ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-[36px] h-[36px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] rounded-[8px] cursor-pointer transition-colors"
                   >
-                    Usar código
+                    {showNueva ? (
+                      <EyeOff className="w-4 h-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="w-4 h-4" aria-hidden="true" />
+                    )}
                   </button>
                 </div>
-              )}
-            </div>
-
-            {resendNotice && (
-              <div
-                role="status"
-                className="rounded-[12px] border border-deep-verdant/60 px-[14px] py-[10px] text-[13px] text-deep-verdant"
-              >
-                {resendNotice}
+                <FieldError
+                  message={fieldError?.campo === 'nuevaPassword' ? fieldError.mensaje : null}
+                />
               </div>
-            )}
 
-            <div>
-              <FieldLabel htmlFor="recovery-codigo" required>
-                Código de Verificación (6 dígitos)
-              </FieldLabel>
-              <input
-                id="recovery-codigo"
-                name="codigo"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]{6}"
-                maxLength={6}
-                autoComplete="one-time-code"
-                value={codigo}
-                onChange={(e) => {
-                  const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 6);
-                  setCodigo(digitsOnly);
-                  setFieldError(null);
-                }}
-                placeholder="Ej. 482910"
-                className={`${inputBaseClass} font-mono tracking-[4px] text-[18px]`}
-              />
-              <FieldError message={fieldError?.mensaje} />
-            </div>
+              <div>
+                <FieldLabel htmlFor="confirm-pass" required>
+                  Confirmar Nueva Contraseña
+                </FieldLabel>
+                <div className="relative">
+                  <input
+                    id="confirm-pass"
+                    type={showConfirmacion ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={confirmacion}
+                    onChange={(e) => {
+                      setConfirmacion(e.target.value);
+                      setFieldError(null);
+                    }}
+                    placeholder="Repita la nueva contraseña"
+                    className={`${inputBaseClass} pr-11`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmacion((prev) => !prev)}
+                    aria-label={
+                      showConfirmacion
+                        ? 'Ocultar confirmación de contraseña'
+                        : 'Mostrar confirmación de contraseña'
+                    }
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-[36px] h-[36px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] rounded-[8px] cursor-pointer transition-colors"
+                  >
+                    {showConfirmacion ? (
+                      <EyeOff className="w-4 h-4" aria-hidden="true" />
+                    ) : (
+                      <Eye className="w-4 h-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+                <FieldError
+                  message={fieldError?.campo === 'confirmacion' ? fieldError.mensaje : null}
+                />
+              </div>
 
-            {/* Opción de reenviar código con temporizador anti-abuso */}
-            <div className="flex flex-wrap items-center justify-between gap-[12px] text-[13px]">
-              <span className="text-ash-gray">¿No recibió el código en su bandeja?</span>
-              <button
-                type="button"
-                data-testid="btn-reenviar-codigo"
-                disabled={resendCooldown > 0}
-                onClick={handleResendCode}
-                className={`inline-flex items-center gap-[6px] font-medium transition-colors ${
-                  resendCooldown > 0
-                    ? 'text-ash-gray cursor-not-allowed opacity-60'
-                    : 'text-saffron-spark hover:text-bone-white underline cursor-pointer'
-                }`}
-              >
-                <RefreshCw className="w-[13px] h-[13px]" aria-hidden="true" />
-                <span>
-                  {resendCooldown > 0
-                    ? `Reenviar código en ${resendCooldown}s`
-                    : 'Reenviar nuevo código'}
+              {fieldError && !fieldError.campo && <FieldError message={fieldError.mensaje} />}
+
+              <div className="pt-2">
+                <PrimaryButton type="submit" data-testid="btn-restablecer-password">
+                  {isRecoveryMode ? 'Restablecer Contraseña' : 'Guardar y continuar'}
+                </PrimaryButton>
+              </div>
+            </form>
+          )}
+
+          {/* PASO 4: CONFIRMACIÓN EXITOSA */}
+          {isRecoveryMode && step === 'success' && (
+            <div
+              role="status"
+              data-testid="confirmacion-restablecimiento"
+              className="rounded-[14px] border border-[var(--status-success-border)] bg-[var(--status-success-soft)] p-5 sm:p-6 space-y-5"
+            >
+              <div className="flex items-start gap-3.5">
+                <span
+                  aria-hidden="true"
+                  className="w-11 h-11 rounded-[12px] bg-[var(--bg-surface)] border border-[var(--status-success-border)] flex items-center justify-center text-[var(--status-success-text)] shrink-0"
+                >
+                  <ShieldCheck className="w-6 h-6" />
                 </span>
-              </button>
-            </div>
-
-            <div className="pt-[6px] flex flex-wrap items-center gap-[14px]">
-              <PrimaryButton type="submit" data-testid="btn-verificar-codigo">
-                Verificar Código
-              </PrimaryButton>
-              <OutlineButton
-                type="button"
-                onClick={() => {
-                  setFieldError(null);
-                  setStep('email');
-                }}
-              >
-                Atrás
-              </OutlineButton>
-            </div>
-          </form>
-        )}
-
-        {/* ====================================================================
-            PASO 3 (O P-02): ESTABLECIMIENTO DE NUEVA CONTRASEÑA
-           ==================================================================== */}
-        {(!isRecoveryMode || step === 'password') && (
-          <form
-            onSubmit={handleResetPassword}
-            data-testid="form-paso-password"
-            className="space-y-[20px]"
-            noValidate
-          >
-            <div>
-              <FieldLabel htmlFor="new-pass" required>
-                Nueva Contraseña
-              </FieldLabel>
-
-              {/* Indicador visual de fortaleza de contraseña */}
-              <div className="mb-[10px] space-y-[6px]">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="text-ash-gray">Fortaleza de la contraseña:</span>
-                  <span data-testid="password-strength-label" className={`font-semibold ${strengthInfo.color}`}>
-                    {strengthInfo.label}
-                  </span>
-                </div>
-                <div className="grid grid-cols-4 gap-[6px]" aria-hidden="true">
-                  {[1, 2, 3, 4].map((level) => (
-                    <div
-                      key={level}
-                      className={`h-[4px] rounded-full transition-colors ${
-                        nueva.length > 0 && strengthScore >= level
-                          ? strengthInfo.barColor
-                          : 'bg-white/12'
-                      }`}
-                    />
-                  ))}
+                <div className="space-y-1">
+                  <h2 className="text-[20px] leading-[1.2] tracking-[-0.015em] font-bold text-[var(--text-primary)]">
+                    Tu contraseña ha sido restablecida con éxito.
+                  </h2>
+                  <p className="text-[14px] text-[var(--text-secondary)]">
+                    La nueva clave para{' '}
+                    <strong className="font-semibold text-[var(--text-primary)]">{correo}</strong>{' '}
+                    ya está activa.
+                  </p>
                 </div>
               </div>
 
-              {/* Reglas de política de seguridad en tiempo real */}
-              <ul
-                id="new-pass-rules"
-                className="mb-[10px] grid grid-cols-1 sm:grid-cols-2 gap-x-[14px] gap-y-[6px] text-[12px] text-silver-mist list-none p-0"
-              >
-                <li className="inline-flex items-center gap-[6px]">
-                  <CheckCircle2
-                    className={`w-[14px] h-[14px] shrink-0 ${
-                      cumpleLongitud ? 'text-deep-verdant' : 'text-ash-gray/60'
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span>Mínimo 10 caracteres</span>
-                </li>
-                <li className="inline-flex items-center gap-[6px]">
-                  <CheckCircle2
-                    className={`w-[14px] h-[14px] shrink-0 ${
-                      cumpleLetra ? 'text-deep-verdant' : 'text-ash-gray/60'
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span>Al menos 1 letra</span>
-                </li>
-                <li className="inline-flex items-center gap-[6px]">
-                  <CheckCircle2
-                    className={`w-[14px] h-[14px] shrink-0 ${
-                      cumpleNumero ? 'text-deep-verdant' : 'text-ash-gray/60'
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span>Al menos 1 número</span>
-                </li>
-                <li className="inline-flex items-center gap-[6px]">
-                  <CheckCircle2
-                    className={`w-[14px] h-[14px] shrink-0 ${
-                      coincidenPasswords ? 'text-deep-verdant' : 'text-ash-gray/60'
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span>Confirmación coincidente</span>
-                </li>
-              </ul>
-
-              <div className="relative">
-                <input
-                  id="new-pass"
-                  type={showNueva ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  value={nueva}
-                  onChange={(e) => {
-                    setNueva(e.target.value);
-                    setFieldError(null);
-                  }}
-                  placeholder="Mínimo 10 caracteres, letra y número"
-                  className={`${inputBaseClass} pr-[46px]`}
-                />
-                <button
+              <div>
+                <PrimaryButton
                   type="button"
-                  onClick={() => setShowNueva((prev) => !prev)}
-                  aria-label={showNueva ? 'Ocultar nueva contraseña' : 'Mostrar nueva contraseña'}
-                  className="absolute right-[10px] top-1/2 -translate-y-1/2 p-[6px] text-ash-gray hover:text-bone-white rounded-full cursor-pointer transition-colors"
+                  data-testid="btn-ir-a-iniciar-sesion"
+                  onClick={() => navigate('/login')}
                 >
-                  {showNueva ? (
-                    <EyeOff className="w-[17px] h-[17px]" aria-hidden="true" />
-                  ) : (
-                    <Eye className="w-[17px] h-[17px]" aria-hidden="true" />
-                  )}
-                </button>
-              </div>
-              <FieldError
-                message={fieldError?.campo === 'nuevaPassword' ? fieldError.mensaje : null}
-              />
-            </div>
-
-            <div>
-              <FieldLabel htmlFor="confirm-pass" required>
-                Confirmar Nueva Contraseña
-              </FieldLabel>
-              <div className="relative">
-                <input
-                  id="confirm-pass"
-                  type={showConfirmacion ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  value={confirmacion}
-                  onChange={(e) => {
-                    setConfirmacion(e.target.value);
-                    setFieldError(null);
-                  }}
-                  placeholder="Repita la nueva contraseña"
-                  className={`${inputBaseClass} pr-[46px]`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmacion((prev) => !prev)}
-                  aria-label={
-                    showConfirmacion
-                      ? 'Ocultar confirmación de contraseña'
-                      : 'Mostrar confirmación de contraseña'
-                  }
-                  className="absolute right-[10px] top-1/2 -translate-y-1/2 p-[6px] text-ash-gray hover:text-bone-white rounded-full cursor-pointer transition-colors"
-                >
-                  {showConfirmacion ? (
-                    <EyeOff className="w-[17px] h-[17px]" aria-hidden="true" />
-                  ) : (
-                    <Eye className="w-[17px] h-[17px]" aria-hidden="true" />
-                  )}
-                </button>
-              </div>
-              <FieldError
-                message={fieldError?.campo === 'confirmacion' ? fieldError.mensaje : null}
-              />
-            </div>
-
-            {fieldError && !fieldError.campo && <FieldError message={fieldError.mensaje} />}
-
-            <div className="pt-[8px] flex flex-wrap items-center gap-[14px]">
-              <PrimaryButton type="submit" data-testid="btn-restablecer-password">
-                {isRecoveryMode ? 'Restablecer Contraseña' : 'Guardar y continuar'}
-              </PrimaryButton>
-            </div>
-          </form>
-        )}
-
-        {/* ====================================================================
-            PASO 4 / 5: CONFIRMACIÓN DE RESTABLECIMIENTO EXITOSO
-           ==================================================================== */}
-        {isRecoveryMode && step === 'success' && (
-          <div
-            role="status"
-            data-testid="confirmacion-restablecimiento"
-            className="rounded-[20px] border border-deep-verdant/60 bg-white/[0.03] p-[24px] sm:p-[30px] space-y-[20px]"
-          >
-            <div className="flex items-center gap-[14px]">
-              <span
-                aria-hidden="true"
-                className="w-[44px] h-[44px] rounded-full bg-deep-verdant/15 border border-deep-verdant/50 flex items-center justify-center text-deep-verdant shrink-0"
-              >
-                <ShieldCheck className="w-[24px] h-[24px]" />
-              </span>
-              <div className="space-y-[4px]">
-                <h2 className="text-[22px] sm:text-[26px] leading-[1.15] tracking-[-0.48px] text-bone-white">
-                  Tu contraseña ha sido restablecida con éxito.
-                </h2>
-                <p className="text-[14px] text-silver-mist">
-                  La nueva clave para <strong className="text-bone-white">{correo}</strong> ya está activa.
-                </p>
+                  Ir a Iniciar Sesión
+                </PrimaryButton>
               </div>
             </div>
-
-            <div className="pt-[6px]">
-              <PrimaryButton
-                type="button"
-                data-testid="btn-ir-a-iniciar-sesion"
-                onClick={() => navigate('/login')}
-              >
-                Ir a Iniciar Sesión
-              </PrimaryButton>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </SurfaceCard>
+      </main>
 
       {/* Footer Note */}
-      <div className="max-w-[1280px] w-full mx-auto text-[12px] text-ash-gray">
-        Política de seguridad: verificación en 2 pasos por correo electrónico (OTP 6 dígitos) y contraseña de mínimo 10 caracteres con letras y números.
-      </div>
+      <footer className="w-full border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]/50 py-4 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1280px] w-full mx-auto text-[12px] text-[var(--text-muted)]">
+          Política de seguridad: verificación en 2 pasos por correo electrónico (OTP 6 dígitos) y contraseña de mínimo 10 caracteres con letras y números.
+        </div>
+      </footer>
     </div>
   );
 }

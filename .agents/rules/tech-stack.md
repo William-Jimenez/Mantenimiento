@@ -3,7 +3,7 @@
 ## 1. Frontend
 - **React 19 & TypeScript 5+:** Componentes funcionales con tipado explícito.
 - **Vite 8:** Bundler rápido con configuración en `vite.config.ts`.
-- **Tailwind CSS v4:** Clases utilitarias modernas sin archivos de configuración legados innecesarios.
+- **Tailwind CSS v4 y Design System (`src/index.css`, `src/components/CommonUI.tsx`):** Tokens semánticos centralizados en variables CSS para Modo Oscuro y Modo Claro (armonía complementaria dividida WCAG 2.2 AA), fuentes `Plus Jakarta Sans` / `Inter` / `JetBrains Mono` y componentes reutilizables accesibles.
 - **Three.js (`HeroModel3D`):**
   - Un único modelo 3D central destacado en `src/screens/LoginScreen.tsx`.
   - Prohibido agregar controles de zoom (ni botones ni eventos de rueda/pinch).

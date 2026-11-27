@@ -1,175 +1,390 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   PRECISION INDUSTRIAL DESIGN SYSTEM — TOKENS & SEMANTIC ARCHITECTURE
+   Split-Complementary Harmony: Cobalt Precision + Industrial Amber + Verdant Teal
+   WCAG 2.2 AA Compliant across Dark (Graphite Control) and Light (Alabaster) modes
+   ========================================================================== */
+
 @theme {
-  /* Colors (from theme_95eb8a8d.css & DESIGN_108d1fc9.md) */
-  --color-void: #000000;
-  --color-bone-white: #ffffff;
-  --color-ash-gray: #9a9a9a;
-  --color-silver-mist: #bdbdbd;
-  --color-electric-iris: #8052ff;
-  --color-saffron-spark: #ffb829;
-  --color-deep-verdant: #15846e;
+  /* Semantic Surface & Text Utilities for Tailwind v4 */
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-subtle: var(--bg-subtle);
 
-  /* Typography */
-  --font-ppneuemontreal: 'PPNeueMontreal', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --color-ink-primary: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
 
-  /* Typography — Scale */
-  --text-caption: 12px;
-  --leading-caption: 1.5;
-  --text-nav-label: 14px;
-  --leading-nav-label: 1.2;
-  --tracking-nav-label: 0.35px;
-  --text-body: 18px;
-  --leading-body: 1.5;
-  --text-heading-2xs: 24px;
-  --leading-heading-2xs: 1.25;
-  --tracking-heading-2xs: -0.48px;
-  --text-heading-xs: 27px;
-  --leading-heading-xs: 1;
-  --text-subheading: 36px;
-  --leading-subheading: 1.2;
-  --text-heading-sm: 42px;
-  --leading-heading-sm: 1.2;
-  --tracking-heading-sm: -1.68px;
-  --text-heading: 48px;
-  --leading-heading: 1.1;
-  --tracking-heading: -1.68px;
-  --text-heading-lg: 78px;
-  --leading-heading-lg: 1.1;
-  --tracking-heading-lg: -3.12px;
-  --text-display: 113px;
-  --leading-display: 1.1;
-  --tracking-display: -4.52px;
+  --color-line-subtle: var(--border-subtle);
+  --color-line-default: var(--border-default);
+  --color-line-strong: var(--border-strong);
 
-  /* Spacing */
-  --spacing-6: 6px;
-  --spacing-12: 12px;
-  --spacing-18: 18px;
-  --spacing-24: 24px;
-  --spacing-30: 30px;
-  --spacing-36: 36px;
-  --spacing-60: 60px;
-  --spacing-96: 96px;
-  --spacing-120: 120px;
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-brand-text: var(--brand-primary-text);
+  --color-accent: var(--brand-accent);
+  --color-accent-text: var(--status-warning-text);
+  --color-success: var(--status-success);
+  --color-success-text: var(--status-success-text);
+  --color-danger: var(--status-danger);
+  --color-danger-text: var(--status-danger-text);
+  --color-info: var(--status-info);
+  --color-info-text: var(--status-info-text);
+  --color-ai: var(--ai-accent);
+  --color-ai-text: var(--ai-accent-text);
 
-  /* Border Radius */
-  --radius-3xl: 24px;
+  /* Backwards-compatible aliases mapped to new semantic palette */
+  --color-void: var(--bg-canvas);
+  --color-bone-white: var(--text-primary);
+  --color-ash-gray: var(--text-muted);
+  --color-silver-mist: var(--text-secondary);
+  --color-electric-iris: var(--brand-primary);
+  --color-saffron-spark: var(--status-warning-text);
+  --color-deep-verdant: var(--status-success-text);
+
+  /* Typography Families */
+  --font-display: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ==========================================================================
+   DARK THEME (DEFAULT — GRAPHITE CONTROL ROOM)
+   ========================================================================== */
+:root,
+html[data-theme="dark"],
+html.theme-dark {
+  color-scheme: dark;
+
+  /* 4-Tier Surface Elevation */
+  --bg-canvas: #0b0f17;
+  --bg-surface: #111827;
+  --bg-elevated: #182234;
+  --bg-subtle: #1e293b;
+  --bg-input: #0e1420;
+  --bg-header: rgba(11, 15, 23, 0.84);
+  --bg-overlay: rgba(5, 8, 15, 0.78);
+
+  /* Borders & Dividers */
+  --border-subtle: #1d283a;
+  --border-default: #29364d;
+  --border-strong: #41526e;
+
+  /* Typography Ink Hierarchy (All >= 5.6:1 contrast on #111827) */
+  --text-primary: #f1f5f9;
+  --text-secondary: #b8c4d6;
+  --text-muted: #8898b0;
+
+  /* Brand & Primary Action (Cobalt Precision — 5.16:1 with #ffffff) */
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-primary-active: #1e40af;
+  --brand-primary-text: #60a5fa;
+  --brand-primary-soft: rgba(37, 99, 235, 0.16);
+  --brand-primary-border: rgba(96, 165, 250, 0.34);
+
+  /* Secondary / Success (Verdant Teal — 9.9:1 text, 5.49:1 fill) */
+  --status-success: #0f766e;
+  --status-success-text: #34d399;
+  --status-success-soft: rgba(16, 185, 129, 0.14);
+  --status-success-border: rgba(52, 211, 153, 0.32);
+
+  /* Accent / Warning (Industrial Amber — 10.5:1 text) */
+  --brand-accent: #f59e0b;
+  --status-warning-text: #fbbf24;
+  --status-warning-soft: rgba(245, 158, 11, 0.14);
+  --status-warning-border: rgba(251, 191, 36, 0.32);
+
+  /* Danger / Error / Rejected (Signal Crimson — 6.4:1 text, 5.4:1 fill) */
+  --status-danger: #dc2626;
+  --status-danger-hover: #b91c1c;
+  --status-danger-text: #f87171;
+  --status-danger-soft: rgba(239, 68, 68, 0.14);
+  --status-danger-border: rgba(248, 113, 113, 0.34);
+
+  /* Info / Assigned (Precision Sky — 8.4:1 text) */
+  --status-info: #0284c7;
+  --status-info-text: #38bdf8;
+  --status-info-soft: rgba(56, 189, 248, 0.14);
+  --status-info-border: rgba(56, 189, 248, 0.32);
+
+  /* AI Intelligence Module Accent (Technical Indigo — 6.1:1 text) */
+  --ai-accent: #6366f1;
+  --ai-accent-text: #a5b4fc;
+  --ai-accent-soft: rgba(99, 102, 241, 0.15);
+  --ai-accent-border: rgba(165, 180, 252, 0.32);
+
+  /* Focus Ring & Shadows */
+  --ring-focus: rgba(96, 165, 250, 0.42);
+  --ring-offset: #0b0f17;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.36), 0 8px 24px -12px rgba(0, 0, 0, 0.55);
+  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.45), 0 24px 48px -16px rgba(0, 0, 0, 0.72);
+  --shadow-btn-primary: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px -6px rgba(37, 99, 235, 0.55);
+
+  /* Subtle Structural Grid Background */
+  --grid-dot-color: rgba(148, 163, 184, 0.08);
+  --hero-glow: radial-gradient(closest-side at 50% 50%, rgba(37, 99, 235, 0.16) 0%, rgba(15, 118, 110, 0.08) 48%, transparent 86%);
+
+  /* Radii Scale (Concentric) */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
   --radius-full: 9999px;
 }
 
+/* ==========================================================================
+   LIGHT THEME (TECHNICAL ALABASTER — HIGH-CLARITY DAYLIGHT)
+   ========================================================================== */
+html[data-theme="light"],
+html.theme-light {
+  color-scheme: light;
+
+  /* 4-Tier Surface Elevation */
+  --bg-canvas: #f4f6fa;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #eaf0f8;
+  --bg-input: #ffffff;
+  --bg-header: rgba(255, 255, 255, 0.88);
+  --bg-overlay: rgba(15, 23, 42, 0.48);
+
+  /* Borders & Dividers */
+  --border-subtle: #e2e8f0;
+  --border-default: #cbd5e1;
+  --border-strong: #94a3b8;
+
+  /* Typography Ink Hierarchy (All >= 5.9:1 contrast on #f4f6fa & #ffffff) */
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #526075;
+
+  /* Brand & Primary Action (Cobalt Precision — 5.16:1 with #ffffff) */
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-primary-active: #1e40af;
+  --brand-primary-text: #1d4ed8;
+  --brand-primary-soft: rgba(37, 99, 235, 0.09);
+  --brand-primary-border: rgba(37, 99, 235, 0.28);
+
+  /* Secondary / Success (Emerald 700 — 5.48:1 on #ffffff) */
+  --status-success: #047857;
+  --status-success-text: #047857;
+  --status-success-soft: #ecfdf5;
+  --status-success-border: #a7f3d0;
+
+  /* Accent / Warning (Amber 700 — 5.02:1 on #ffffff) */
+  --brand-accent: #d97706;
+  --status-warning-text: #b45309;
+  --status-warning-soft: #fffbeb;
+  --status-warning-border: #fde68a;
+
+  /* Danger / Error / Rejected (Red 700 — 6.47:1 on #ffffff) */
+  --status-danger: #dc2626;
+  --status-danger-hover: #b91c1c;
+  --status-danger-text: #b91c1c;
+  --status-danger-soft: #fef2f2;
+  --status-danger-border: #fecaca;
+
+  /* Info / Assigned (Sky 700 — 5.93:1 on #ffffff) */
+  --status-info: #0369a1;
+  --status-info-text: #0369a1;
+  --status-info-soft: #f0f9ff;
+  --status-info-border: #bae6fd;
+
+  /* AI Intelligence Module Accent (Indigo 600 — 6.29:1 on #ffffff) */
+  --ai-accent: #4f46e5;
+  --ai-accent-text: #4338ca;
+  --ai-accent-soft: #eef2ff;
+  --ai-accent-border: #c7d2fe;
+
+  /* Focus Ring & Shadows */
+  --ring-focus: rgba(37, 99, 235, 0.28);
+  --ring-offset: #ffffff;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 16px -4px rgba(15, 23, 42, 0.06);
+  --shadow-elevated: 0 4px 12px rgba(15, 23, 42, 0.08), 0 24px 48px -12px rgba(15, 23, 42, 0.18);
+  --shadow-btn-primary: 0 1px 2px rgba(37, 99, 235, 0.2), 0 6px 16px -4px rgba(37, 99, 235, 0.35);
+
+  /* Subtle Structural Grid Background */
+  --grid-dot-color: rgba(15, 23, 42, 0.06);
+  --hero-glow: radial-gradient(closest-side at 50% 50%, rgba(37, 99, 235, 0.11) 0%, rgba(4, 120, 87, 0.06) 48%, transparent 86%);
+}
+
+/* ==========================================================================
+   BASE LAYER & ACCESSIBILITY FOUNDATIONS
+   ========================================================================== */
 @layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
   html,
   body {
-    background-color: var(--color-void);
-    color: var(--color-bone-white);
-    font-family: var(--font-ppneuemontreal);
-    font-feature-settings: "ss01" on;
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.55;
     margin: 0;
     padding: 0;
     min-height: 100vh;
     overflow-x: hidden;
+    transition: background-color 200ms ease, color 200ms ease;
   }
 
-  /* Headlines in Dala never use bold weight; hierarchy comes from scale and negative tracking */
   h1, h2, h3, h4 {
-    font-weight: 400;
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--text-primary);
     text-wrap: balance;
+    letter-spacing: -0.025em;
+  }
+
+  p, li {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background-color: var(--brand-primary);
+    color: #ffffff;
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-electric-iris);
+    outline: 2px solid var(--brand-primary-text);
     outline-offset: 2px;
   }
 
   input,
   textarea,
   select {
-    color-scheme: dark;
+    font-family: var(--font-sans);
+  }
+
+  img {
+    outline: 1px solid rgba(128, 128, 128, 0.14);
+    outline-offset: -1px;
   }
 }
 
 /* ==========================================================================
-   Light Theme Support (html[data-theme="light"] / html.theme-light)
+   DESIGN SYSTEM UTILITY CLASSES
    ========================================================================== */
-html[data-theme="light"],
-html.theme-light {
-  --color-void: #f8fafc;
-  --color-bone-white: #0f172a;
-  --color-ash-gray: #475569;
-  --color-silver-mist: #334155;
-  --color-electric-iris: #6d28d9;
-  --color-saffron-spark: #b45309;
-  --color-deep-verdant: #0f766e;
-  color-scheme: light;
+.font-display {
+  font-family: var(--font-display);
 }
 
-html[data-theme="light"] input,
-html[data-theme="light"] textarea,
-html[data-theme="light"] select,
-html.theme-light input,
-html.theme-light textarea,
-html.theme-light select {
-  color-scheme: light;
-  background-color: #ffffff;
-  border-color: rgba(15, 23, 42, 0.22);
-}
-
-html[data-theme="light"] .bg-electric-iris,
-html[data-theme="light"] .bg-deep-verdant,
-html.theme-light .bg-electric-iris,
-html.theme-light .bg-deep-verdant {
-  color: #ffffff;
-}
-
-html[data-theme="light"] [class*="border-white/"],
-html.theme-light [class*="border-white/"] {
-  border-color: rgba(15, 23, 42, 0.14);
-}
-
-html[data-theme="light"] [class*="divide-white/"] > :not([hidden]) ~ :not([hidden]),
-html.theme-light [class*="divide-white/"] > :not([hidden]) ~ :not([hidden]) {
-  border-color: rgba(15, 23, 42, 0.12);
-}
-
-html[data-theme="light"] [class*="bg-white/"],
-html.theme-light [class*="bg-white/"] {
-  background-color: rgba(15, 23, 42, 0.035);
+.font-mono-code {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
+.body-readable,
 .body-ultralight {
-  font-size: 18px;
-  line-height: 1.5;
-  font-weight: 200;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  font-weight: 400;
 }
 
 .nav-label {
-  font-size: 14px;
-  line-height: 1.2;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1.25;
   font-weight: 600;
-  letter-spacing: 0.35px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-/* Validation states after interaction (:user-invalid / :user-valid + JS fallback) */
+.surface-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+
+.surface-elevated {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-elevated);
+}
+
+.technical-grid-bg {
+  background-image: radial-gradient(circle, var(--grid-dot-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Form validation states after interaction */
 .form-input-validated:is(:user-invalid, .user-invalid-fallback) {
-  border-color: var(--color-saffron-spark);
+  border-color: var(--status-danger-text);
+  box-shadow: 0 0 0 3px var(--status-danger-soft);
 }
 
 .form-input-validated:is(:user-valid, .user-valid-fallback) {
-  border-color: var(--color-deep-verdant);
+  border-color: var(--status-success-text);
 }
 
-/* Scroll-Driven Narrative Entry & Exit Animations (CSS View Timeline + Reduced Motion Compliance) */
+/* Subtle modal & toast entrance */
+@keyframes ds-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.animate-ds-enter {
+  animation: ds-fade-up 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Hide scrollbars cleanly where horizontal tab strip scrolls */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Skip to main content link (Keyboard a11y) */
+.skip-link {
+  position: fixed;
+  top: -100px;
+  left: 16px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background-color: var(--brand-primary);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-elevated);
+  transition: top 150ms ease;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
+/* Scroll-Driven Narrative Entry & Exit Animations */
 @media (prefers-reduced-motion: no-preference) {
   @supports ((animation-timeline: view()) and (animation-range: entry)) {
     @keyframes narrative-text-reveal {
       entry 0% {
         opacity: 0;
-        transform: translate3d(0, 36px, 0);
+        transform: translate3d(0, 28px, 0);
       }
       entry 100%,
       exit 0% {
@@ -177,15 +392,15 @@ html.theme-light [class*="bg-white/"] {
         transform: translate3d(0, 0, 0);
       }
       exit 100% {
-        opacity: 0.15;
-        transform: translate3d(0, -28px, 0);
+        opacity: 0.25;
+        transform: translate3d(0, -20px, 0);
       }
     }
 
     @keyframes narrative-stage-reveal {
       entry 0% {
         opacity: 0;
-        scale: 0.9;
+        scale: 0.94;
       }
       entry 100%,
       exit 0% {
@@ -193,8 +408,8 @@ html.theme-light [class*="bg-white/"] {
         scale: 1;
       }
       exit 100% {
-        opacity: 0.2;
-        scale: 0.94;
+        opacity: 0.3;
+        scale: 0.96;
       }
     }
 
@@ -210,9 +425,18 @@ html.theme-light [class*="bg-white/"] {
   }
 }
 
+/* Reduced Motion Compliance (WCAG 2.2) */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 
   .narrative-screen-content,

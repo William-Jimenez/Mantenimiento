@@ -1,14 +1,19 @@
 import React, { useMemo, useState } from 'react';
+import { KeyRound, UserPlus } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
+  AlertBanner,
   EmptyState,
   FieldError,
   FieldLabel,
+  FilterChip,
   GhostButton,
   inputBaseClass,
   ModalDialog,
   OutlineButton,
+  PageHeader,
   PrimaryButton,
+  SurfaceCard,
 } from '../components/CommonUI';
 import { ErrorScreen } from './ErrorScreen';
 import { PerfilUsuario } from '../types/domain';
@@ -211,31 +216,20 @@ export function UsersScreen() {
   };
 
   return (
-    <section className="space-y-[36px]">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-[24px]">
-        <div className="space-y-[12px]">
-          <p className="nav-label text-saffron-spark">Administración · Gestión de Usuarios y Roles</p>
-          <h1 className="text-[42px] sm:text-[56px] leading-[1.08] tracking-[-1.68px] text-bone-white">
-            Usuarios y roles
-          </h1>
-          <p className="body-ultralight text-silver-mist max-w-[620px]">
-            Cree, edite, desactive y cambie el rol de los usuarios entre Administrador, Empleado (Técnico) y Cliente. El sistema protege al último Administrador activo.
-          </p>
-        </div>
+    <section className="space-y-6">
+      <PageHeader
+        eyebrow="Administración · Gestión de Usuarios y Roles"
+        title="Usuarios y roles"
+        description="Cree, edite, desactive y cambie el rol de los usuarios entre Administrador, Empleado (Técnico) y Cliente. El sistema protege al último Administrador activo."
+        actions={
+          <PrimaryButton onClick={handleOpenCrear}>
+            <UserPlus className="w-4 h-4" aria-hidden="true" />
+            <span>Crear usuario</span>
+          </PrimaryButton>
+        }
+      />
 
-        <PrimaryButton onClick={handleOpenCrear}>
-          Crear usuario
-        </PrimaryButton>
-      </div>
-
-      {errorRegla && (
-        <div
-          role="alert"
-          className="border border-saffron-spark/70 rounded-[12px] px-[16px] py-[12px] text-[14px] text-saffron-spark"
-        >
-          {errorRegla}
-        </div>
-      )}
+      {errorRegla && <AlertBanner variant="error">{errorRegla}</AlertBanner>}
 
       {usuarios.length === 0 ? (
         <EmptyState
@@ -243,79 +237,177 @@ export function UsersScreen() {
           description="Cree un usuario y asígnele su rol para habilitar el inicio de sesión."
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/15 text-[12px] uppercase tracking-[0.35px] text-ash-gray">
-                <th className="py-[12px] pr-[18px] font-semibold">Usuario</th>
-                <th className="py-[12px] pr-[18px] font-semibold">Rol</th>
-                <th className="py-[12px] pr-[18px] font-semibold">Estado</th>
-                <th className="py-[12px] pr-[18px] font-semibold">Último acceso</th>
-                <th className="py-[12px] text-right font-semibold">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10 text-[15px]">
-              {usuarios.map((usr) => {
-                const emp = empleados.find((e) => e.id === usr.empleadoId);
-                const nombre = emp ? `${emp.nombres} ${emp.apellidos}` : `Usuario #${usr.id}`;
-
-                return (
-                  <tr key={usr.id} className="hover:bg-white/[0.03] transition-colors">
-                    <td className="py-[16px] pr-[18px]">
-                      <div className="text-bone-white">{nombre}</div>
-                      <div className="text-[13px] text-ash-gray">
-                        {emp?.correo ?? '—'} {emp?.cargo ? `· ${emp.cargo}` : ''}
-                      </div>
-                    </td>
-                    <td className="py-[16px] pr-[18px]">
-                      <select
-                        aria-label={`Rol de ${nombre}`}
-                        value={usr.perfil}
-                        onChange={(e) =>
-                          handleCambiarPerfil(usr.id, e.target.value as PerfilUsuario)
-                        }
-                        className="bg-void text-bone-white border border-white/20 rounded-[12px] px-[12px] py-[6px] text-[14px]"
-                      >
-                        <option value="ADMINISTRADOR">Administrador</option>
-                        <option value="EMPLEADO">Empleado (Técnico)</option>
-                        <option value="CLIENTE">Cliente</option>
-                      </select>
-                    </td>
-                    <td className="py-[16px] pr-[18px] text-[14px]">
-                      <span className={usr.activo ? 'text-deep-verdant' : 'text-ash-gray'}>
-                        {usr.activo ? 'Activo' : 'Desactivado'}
-                      </span>
-                      {usr.debeCambiarPassword && (
-                        <span className="block text-[12px] text-saffron-spark">
-                          Contraseña temporal pendiente
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-[16px] pr-[18px] tabular-nums text-[14px] text-silver-mist">
-                      {formatearFecha(usr.ultimoAcceso)}
-                    </td>
-                    <td className="py-[16px] text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-[12px]">
-                        <GhostButton onClick={() => handleOpenEditar(usr.id)}>
-                          Editar
-                        </GhostButton>
-                        <GhostButton
-                          disabled={!usr.activo}
-                          onClick={() => handleResetPassword(usr.id, nombre)}
-                        >
-                          Restablecer contraseña
-                        </GhostButton>
-                        <GhostButton onClick={() => handleToggleActivo(usr.id)}>
-                          {usr.activo ? 'Desactivar' : 'Activar'}
-                        </GhostButton>
-                      </div>
-                    </td>
+        <>
+          {/* Desktop Table */}
+          <SurfaceCard padded={false} className="hidden lg:block overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[var(--bg-subtle)]/70 border-b border-[var(--border-subtle)] text-[12px] uppercase tracking-[0.05em] text-[var(--text-muted)]">
+                    <th className="py-3.5 pl-5 pr-4 font-semibold">Usuario</th>
+                    <th className="py-3.5 px-4 font-semibold">Rol</th>
+                    <th className="py-3.5 px-4 font-semibold">Estado</th>
+                    <th className="py-3.5 px-4 font-semibold">Último acceso</th>
+                    <th className="py-3.5 pl-4 pr-5 text-right font-semibold">Acciones</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)] text-[14px]">
+                  {usuarios.map((usr) => {
+                    const emp = empleados.find((e) => e.id === usr.empleadoId);
+                    const nombre = emp ? `${emp.nombres} ${emp.apellidos}` : `Usuario #${usr.id}`;
+
+                    return (
+                      <tr
+                        key={usr.id}
+                        className="hover:bg-[var(--bg-subtle)]/50 transition-colors"
+                      >
+                        <td className="py-4 pl-5 pr-4">
+                          <div className="font-semibold text-[var(--text-primary)]">{nombre}</div>
+                          <div className="text-[12px] text-[var(--text-muted)] mt-0.5">
+                            <span className="font-mono-code">{emp?.correo ?? '—'}</span>
+                            {emp?.cargo ? ` · ${emp.cargo}` : ''}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <select
+                            aria-label={`Rol de ${nombre}`}
+                            value={usr.perfil}
+                            onChange={(e) =>
+                              handleCambiarPerfil(usr.id, e.target.value as PerfilUsuario)
+                            }
+                            className="bg-[var(--bg-input)] text-[var(--text-primary)] border border-[var(--border-default)] hover:border-[var(--border-strong)] focus:border-[var(--brand-primary-text)] rounded-[8px] px-3 py-1.5 text-[13px] font-medium outline-none cursor-pointer"
+                          >
+                            <option value="ADMINISTRADOR">Administrador</option>
+                            <option value="EMPLEADO">Empleado (Técnico)</option>
+                            <option value="CLIENTE">Cliente</option>
+                          </select>
+                        </td>
+                        <td className="py-4 px-4 text-[13px] space-y-1">
+                          <div>
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[6px] border text-[12px] font-semibold ${
+                                usr.activo
+                                  ? 'bg-[var(--status-success-soft)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
+                                  : 'bg-[var(--bg-subtle)] border-[var(--border-default)] text-[var(--text-muted)]'
+                              }`}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  usr.activo
+                                    ? 'bg-[var(--status-success-text)]'
+                                    : 'bg-[var(--text-muted)]'
+                                }`}
+                              />
+                              {usr.activo ? 'Activo' : 'Desactivado'}
+                            </span>
+                          </div>
+                          {usr.debeCambiarPassword && (
+                            <span className="inline-block text-[11px] font-medium text-[var(--status-warning-text)]">
+                              Contraseña temporal pendiente
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 font-mono-code text-[12px] text-[var(--text-secondary)]">
+                          {formatearFecha(usr.ultimoAcceso)}
+                        </td>
+                        <td className="py-4 pl-4 pr-5 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1">
+                            <GhostButton onClick={() => handleOpenEditar(usr.id)}>
+                              Editar
+                            </GhostButton>
+                            <GhostButton
+                              disabled={!usr.activo}
+                              onClick={() => handleResetPassword(usr.id, nombre)}
+                            >
+                              Restablecer contraseña
+                            </GhostButton>
+                            <GhostButton onClick={() => handleToggleActivo(usr.id)}>
+                              {usr.activo ? 'Desactivar' : 'Activar'}
+                            </GhostButton>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </SurfaceCard>
+
+          {/* Mobile / Tablet Cards */}
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {usuarios.map((usr) => {
+              const emp = empleados.find((e) => e.id === usr.empleadoId);
+              const nombre = emp ? `${emp.nombres} ${emp.apellidos}` : `Usuario #${usr.id}`;
+
+              return (
+                <SurfaceCard key={usr.id} className="space-y-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[16px] font-bold text-[var(--text-primary)] truncate">
+                        {nombre}
+                      </p>
+                      <p className="text-[12px] font-mono-code text-[var(--text-muted)] truncate">
+                        {emp?.correo ?? '—'}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-[6px] border text-[11px] font-semibold shrink-0 ${
+                        usr.activo
+                          ? 'bg-[var(--status-success-soft)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
+                          : 'bg-[var(--bg-subtle)] border-[var(--border-default)] text-[var(--text-muted)]'
+                      }`}
+                    >
+                      {usr.activo ? 'Activo' : 'Desactivado'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <select
+                      aria-label={`Rol de ${nombre}`}
+                      value={usr.perfil}
+                      onChange={(e) =>
+                        handleCambiarPerfil(usr.id, e.target.value as PerfilUsuario)
+                      }
+                      className={`${inputBaseClass} !min-h-[40px] !py-1.5 text-[13px]`}
+                    >
+                      <option value="ADMINISTRADOR">Administrador</option>
+                      <option value="EMPLEADO">Empleado (Técnico)</option>
+                      <option value="CLIENTE">Cliente</option>
+                    </select>
+                    {usr.debeCambiarPassword && (
+                      <p className="text-[12px] font-medium text-[var(--status-warning-text)]">
+                        Contraseña temporal pendiente
+                      </p>
+                    )}
+                    <p className="text-[12px] font-mono-code text-[var(--text-muted)]">
+                      Último acceso: {formatearFecha(usr.ultimoAcceso)}
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-2">
+                    <OutlineButton
+                      onClick={() => handleOpenEditar(usr.id)}
+                      className="!min-h-[38px] !py-1.5 !px-3 !text-[13px]"
+                    >
+                      Editar
+                    </OutlineButton>
+                    <GhostButton
+                      disabled={!usr.activo}
+                      onClick={() => handleResetPassword(usr.id, nombre)}
+                    >
+                      Restablecer contraseña
+                    </GhostButton>
+                    <GhostButton onClick={() => handleToggleActivo(usr.id)}>
+                      {usr.activo ? 'Desactivar' : 'Activar'}
+                    </GhostButton>
+                  </div>
+                </SurfaceCard>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* Modal crear usuario */}
@@ -324,31 +416,21 @@ export function UsersScreen() {
         title="Crear usuario"
         onClose={() => setCrearOpen(false)}
       >
-        <form onSubmit={handleCrearUsuario} className="space-y-[18px]">
+        <form onSubmit={handleCrearUsuario} className="space-y-4">
           {empleadosSinUsuario.length > 0 && (
-            <div className="flex items-center gap-[8px] pb-[6px]">
-              <button
-                type="button"
+            <div className="flex flex-wrap items-center gap-2 pb-1">
+              <FilterChip
+                active={modoCreacion === 'nuevo'}
                 onClick={() => setModoCreacion('nuevo')}
-                className={`px-[12px] py-[6px] rounded-full text-[13px] cursor-pointer transition-colors ${
-                  modoCreacion === 'nuevo'
-                    ? 'bg-electric-iris text-bone-white'
-                    : 'border border-white/15 text-ash-gray hover:text-bone-white'
-                }`}
               >
                 Registrar persona nueva
-              </button>
-              <button
-                type="button"
+              </FilterChip>
+              <FilterChip
+                active={modoCreacion === 'existente'}
                 onClick={() => setModoCreacion('existente')}
-                className={`px-[12px] py-[6px] rounded-full text-[13px] cursor-pointer transition-colors ${
-                  modoCreacion === 'existente'
-                    ? 'bg-electric-iris text-bone-white'
-                    : 'border border-white/15 text-ash-gray hover:text-bone-white'
-                }`}
               >
                 Asociar existente ({empleadosSinUsuario.length})
-              </button>
+              </FilterChip>
             </div>
           )}
 
@@ -371,8 +453,8 @@ export function UsersScreen() {
               </select>
             </div>
           ) : (
-            <div className="space-y-[14px]">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-[12px]">
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <FieldLabel htmlFor="usr-nuevo-nombres" required>
                     Nombres
@@ -399,7 +481,7 @@ export function UsersScreen() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-[12px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <FieldLabel htmlFor="usr-nuevo-doc" required>
                     Documento
@@ -413,9 +495,7 @@ export function UsersScreen() {
                   />
                 </div>
                 <div>
-                  <FieldLabel htmlFor="usr-nuevo-cargo">
-                    Cargo / Área
-                  </FieldLabel>
+                  <FieldLabel htmlFor="usr-nuevo-cargo">Cargo / Área</FieldLabel>
                   <input
                     id="usr-nuevo-cargo"
                     type="text"
@@ -475,7 +555,7 @@ export function UsersScreen() {
 
           <FieldError message={errorCrearModal} />
 
-          <div className="flex items-center gap-[12px] pt-[12px]">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <PrimaryButton type="submit">Generar usuario</PrimaryButton>
             <OutlineButton onClick={() => setCrearOpen(false)}>Cancelar</OutlineButton>
           </div>
@@ -488,8 +568,8 @@ export function UsersScreen() {
         title="Editar usuario y rol"
         onClose={() => setEditUsuarioId(null)}
       >
-        <form onSubmit={handleGuardarEdicion} className="space-y-[16px]">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-[12px]">
+        <form onSubmit={handleGuardarEdicion} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <FieldLabel htmlFor="edit-usr-nombres" required>
                 Nombres
@@ -529,11 +609,9 @@ export function UsersScreen() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-[12px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <FieldLabel htmlFor="edit-usr-cargo">
-                Cargo / Área
-              </FieldLabel>
+              <FieldLabel htmlFor="edit-usr-cargo">Cargo / Área</FieldLabel>
               <input
                 id="edit-usr-cargo"
                 type="text"
@@ -560,38 +638,50 @@ export function UsersScreen() {
             </div>
           </div>
 
-          <label className="flex items-center gap-[10px] pt-[4px] cursor-pointer">
+          <label className="flex items-center gap-3 p-3 rounded-[10px] border border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 cursor-pointer">
             <input
               type="checkbox"
               checked={editActivo}
               onChange={(e) => setEditActivo(e.target.checked)}
-              className="w-4 h-4 accent-electric-iris"
+              className="w-4 h-4 accent-[var(--brand-primary)]"
             />
-            <span className="text-[14px] text-bone-white">Usuario activo</span>
+            <span className="text-[14px] font-medium text-[var(--text-primary)]">
+              Usuario activo
+            </span>
           </label>
 
           <FieldError message={errorEditarModal} />
 
-          <div className="flex items-center gap-[12px] pt-[10px]">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <PrimaryButton type="submit">Guardar cambios</PrimaryButton>
             <OutlineButton onClick={() => setEditUsuarioId(null)}>Cancelar</OutlineButton>
           </div>
         </form>
       </ModalDialog>
 
-      {/* One-time temporary password modal (RS-01, RS-04) */}
+      {/* One-time temporary password modal */}
       <ModalDialog
         open={!!passwordUnica}
         title={passwordUnica?.motivo ?? 'Contraseña temporal'}
         onClose={() => setPasswordUnica(null)}
       >
         {passwordUnica && (
-          <div className="space-y-[18px]">
-            <p className="body-ultralight text-silver-mist">
-              Entregue esta contraseña temporal a <strong className="text-bone-white font-normal">{passwordUnica.empleado}</strong>. Se muestra una única vez y deberá cambiarla en su próximo inicio de sesión.
+          <div className="space-y-5">
+            <p className="body-readable text-[var(--text-secondary)]">
+              Entregue esta contraseña temporal a{' '}
+              <strong className="font-semibold text-[var(--text-primary)]">
+                {passwordUnica.empleado}
+              </strong>
+              . Se muestra una única vez y deberá cambiarla en su próximo inicio de sesión.
             </p>
-            <div className="border border-saffron-spark/50 rounded-[12px] px-[18px] py-[14px] text-[20px] tabular-nums tracking-wide text-saffron-spark select-all">
-              {passwordUnica.password}
+            <div className="flex items-center gap-3 border border-[var(--status-warning-border)] bg-[var(--status-warning-soft)] rounded-[12px] px-4 py-3.5">
+              <KeyRound
+                className="w-5 h-5 text-[var(--status-warning-text)] shrink-0"
+                aria-hidden="true"
+              />
+              <span className="font-mono-code text-[20px] font-bold tracking-[0.06em] text-[var(--status-warning-text)] select-all">
+                {passwordUnica.password}
+              </span>
             </div>
             <PrimaryButton onClick={() => setPasswordUnica(null)}>Entendido</PrimaryButton>
           </div>

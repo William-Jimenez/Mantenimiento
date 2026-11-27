@@ -1,8 +1,35 @@
 import React from 'react';
+import {
+  ArrowRight,
+  ChevronRight,
+  Cpu,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Tags,
+  Users,
+  Wrench,
+} from 'lucide-react';
 import { useApp, useSolicitudesVisibles } from '../context/AppContext';
 import { ESTADOS_ORDEN, formatearFecha } from '../services/domainRules';
-import { EmptyState, EstadoLabel, GhostButton, PrimaryButton } from '../components/CommonUI';
+import {
+  EmptyState,
+  EstadoLabel,
+  GhostButton,
+  PageHeader,
+  PrimaryButton,
+  SurfaceCard,
+} from '../components/CommonUI';
 import { EstadoNombre } from '../types/domain';
+
+const STATE_ACCENT_BAR: Record<EstadoNombre, string> = {
+  Pendiente: 'bg-[var(--brand-accent)]',
+  Asignada: 'bg-[var(--status-info)]',
+  'En proceso': 'bg-[var(--ai-accent)]',
+  Finalizada: 'bg-[var(--status-success-text)]',
+  Cancelada: 'bg-[var(--border-strong)]',
+  Rechazada: 'bg-[var(--status-danger)]',
+};
 
 export function DashboardScreen() {
   const {
@@ -46,49 +73,82 @@ export function DashboardScreen() {
       })
     : [];
 
+  const adminModules = [
+    {
+      code: 'M1 · M4',
+      title: 'Empleados',
+      desc: 'Altas, edición y marca de personal técnico.',
+      path: '/admin/empleados',
+      Icon: Users,
+      iconBg: 'bg-[var(--brand-primary-soft)] border-[var(--brand-primary-border)] text-[var(--brand-primary-text)]',
+    },
+    {
+      code: 'M1',
+      title: 'Usuarios',
+      desc: 'Perfiles, activación y restablecimiento de claves.',
+      path: '/admin/usuarios',
+      Icon: ShieldCheck,
+      iconBg: 'bg-[var(--ai-accent-soft)] border-[var(--ai-accent-border)] text-[var(--ai-accent-text)]',
+    },
+    {
+      code: 'M2',
+      title: 'Recursos',
+      desc: 'Equipos, instalaciones, maquinaria y herramientas.',
+      path: '/admin/recursos',
+      Icon: Cpu,
+      iconBg: 'bg-[var(--status-success-soft)] border-[var(--status-success-border)] text-[var(--status-success-text)]',
+    },
+    {
+      code: 'SU-06',
+      title: 'Categorías',
+      desc: 'Catálogo de clasificación de daños.',
+      path: '/admin/categorias',
+      Icon: Tags,
+      iconBg: 'bg-[var(--status-warning-soft)] border-[var(--status-warning-border)] text-[var(--status-warning-text)]',
+    },
+  ];
+
   return (
-    <div className="space-y-[60px]">
-      {/* Hero header */}
-      <section className="relative overflow-hidden py-[12px]">
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end justify-between gap-[30px]">
-          <div className="space-y-[18px] max-w-[760px]">
-            <p className="nav-label text-saffron-spark">
-              {isAdmin
-                ? 'Panel de Administración'
-                : isTecnico
-                ? 'Panel de Empleado · Técnico de Mantenimiento'
-                : 'Portal de Cliente · Solicitudes de Mantenimiento'}
-            </p>
-            <h1 className="text-[42px] sm:text-[60px] lg:text-[72px] leading-[1.05] tracking-[-1.68px] lg:tracking-[-2.88px] text-bone-white">
-              Hola, {currentEmpleado?.nombres}.
-            </h1>
-            <p className="body-ultralight text-silver-mist max-w-[540px]">
-              {isAdmin
-                ? 'Gestione usuarios y roles, supervise todas las solicitudes de mantenimiento de la empresa y asigne técnicos responsables.'
-                : isTecnico
-                ? 'Consulte las solicitudes asignadas a su cargo, actualice su estado operativo y registre el trabajo de reparación realizado.'
-                : 'Solicite mantenimiento desde la página web y consulte en tiempo real el estado de sus propias solicitudes.'}
-            </p>
-          </div>
+    <div className="space-y-10">
+      {/* Executive Role Header */}
+      <PageHeader
+        eyebrow={
+          isAdmin
+            ? 'Panel de Administración'
+            : isTecnico
+            ? 'Panel de Empleado · Técnico de Mantenimiento'
+            : 'Portal de Cliente · Solicitudes de Mantenimiento'
+        }
+        title={`Hola, ${currentEmpleado?.nombres}.`}
+        description={
+          isAdmin
+            ? 'Gestione usuarios y roles, supervise todas las solicitudes de mantenimiento de la empresa y asigne técnicos responsables.'
+            : isTecnico
+            ? 'Consulte las solicitudes asignadas a su cargo, actualice su estado operativo y registre el trabajo de reparación realizado.'
+            : 'Solicite mantenimiento desde la página web y consulte en tiempo real el estado de sus propias solicitudes.'
+        }
+        actions={
+          isTecnico ? (
+            <PrimaryButton onClick={() => navigate('/tecnico/solicitudes')}>
+              <Wrench className="w-4 h-4" aria-hidden="true" />
+              <span>Ver mis solicitudes asignadas</span>
+            </PrimaryButton>
+          ) : (
+            <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
+              <Plus className="w-4 h-4" aria-hidden="true" />
+              <span>Nueva solicitud</span>
+            </PrimaryButton>
+          )
+        }
+      />
 
-          <div className="shrink-0">
-            {isTecnico ? (
-              <PrimaryButton onClick={() => navigate('/tecnico/solicitudes')}>
-                Ver mis solicitudes asignadas
-              </PrimaryButton>
-            ) : (
-              <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
-                Nueva solicitud
-              </PrimaryButton>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Counters by state (links to P-05 filtered) */}
-      <section aria-labelledby="resumen-estados-titulo" className="space-y-[24px]">
-        <div className="flex items-center justify-between gap-4">
-          <h2 id="resumen-estados-titulo" className="text-[24px] tracking-[-0.48px] text-bone-white">
+      {/* Operational KPI Counters by State */}
+      <section aria-labelledby="resumen-estados-titulo" className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2
+            id="resumen-estados-titulo"
+            className="text-[19px] sm:text-[21px] font-bold tracking-[-0.015em] text-[var(--text-primary)]"
+          >
             {isAdmin
               ? 'Todas las solicitudes por estado'
               : isTecnico
@@ -96,11 +156,11 @@ export function DashboardScreen() {
               : 'Estado de mis solicitudes'}
           </h2>
           <GhostButton onClick={() => irAListadoFiltrado()}>
-            Ver listado completo →
+            <span>Ver listado completo →</span>
           </GhostButton>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 border-t border-b border-white/12 divide-y sm:divide-y-0 sm:divide-x divide-white/12">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
           {ESTADOS_ORDEN.map((estado) => {
             const count = contarPorEstado(estado);
             return (
@@ -108,23 +168,38 @@ export function DashboardScreen() {
                 key={estado}
                 type="button"
                 onClick={() => irAListadoFiltrado(estado)}
-                className="text-left p-[18px] hover:bg-white/[0.04] transition-colors cursor-pointer flex flex-col justify-between gap-[12px]"
+                className="group relative overflow-hidden surface-card text-left p-4 hover:border-[var(--border-strong)] hover:-translate-y-0.5 transition-[border-color,transform,box-shadow] duration-150 ease-out cursor-pointer flex flex-col justify-between gap-4 focus-visible:outline-2 focus-visible:outline-[var(--brand-primary-text)] focus-visible:outline-offset-2"
               >
-                <EstadoLabel estado={estado} />
-                <span className="text-[36px] leading-none tracking-[-0.04em] tabular-nums text-bone-white">
-                  {count}
-                </span>
+                <span
+                  aria-hidden="true"
+                  className={`absolute top-0 left-0 right-0 h-[3px] opacity-85 group-hover:opacity-100 transition-opacity ${STATE_ACCENT_BAR[estado]}`}
+                />
+                <div className="pt-0.5">
+                  <EstadoLabel estado={estado} />
+                </div>
+                <div className="flex items-end justify-between gap-2">
+                  <span className="font-display text-[32px] sm:text-[34px] font-bold leading-none tracking-[-0.03em] tabular-nums text-[var(--text-primary)]">
+                    {count}
+                  </span>
+                  <ArrowRight
+                    className="w-4 h-4 text-[var(--text-muted)] opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150"
+                    aria-hidden="true"
+                  />
+                </div>
               </button>
             );
           })}
         </div>
       </section>
 
-      {/* Empleado Técnico: Asignadas a mí (User Flow 4.2, RC-05) */}
+      {/* Empleado Técnico: Asignadas a mí */}
       {isTecnico && (
-        <section aria-labelledby="asignadas-titulo" className="space-y-[24px]">
-          <div className="flex items-center justify-between gap-4">
-            <h2 id="asignadas-titulo" className="text-[24px] tracking-[-0.48px] text-bone-white">
+        <section aria-labelledby="asignadas-titulo" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2
+              id="asignadas-titulo"
+              className="text-[19px] sm:text-[21px] font-bold tracking-[-0.015em] text-[var(--text-primary)]"
+            >
               Asignadas a mí
             </h2>
             <GhostButton
@@ -147,7 +222,7 @@ export function DashboardScreen() {
               description="Cuando el Administrador le asigne una solicitud activa, aparecerá aquí para iniciar atención."
             />
           ) : (
-            <div className="border-t border-white/12 divide-y divide-white/10">
+            <SurfaceCard padded={false} className="overflow-hidden divide-y divide-[var(--border-subtle)]">
               {asignadasAMi.map((sol) => {
                 const rec = recursos.find((r) => r.id === sol.recursoId);
                 return (
@@ -155,108 +230,107 @@ export function DashboardScreen() {
                     key={sol.id}
                     type="button"
                     onClick={() => navigate(`/solicitudes/${sol.id}`)}
-                    className="w-full text-left py-[18px] flex flex-col sm:flex-row sm:items-center justify-between gap-[12px] hover:bg-white/[0.03] px-[6px] transition-colors cursor-pointer"
+                    className="group w-full text-left px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[var(--bg-subtle)]/70 transition-colors duration-150 cursor-pointer"
                   >
-                    <div className="space-y-[6px]">
-                      <div className="flex flex-wrap items-center gap-[12px]">
-                        <span className="tabular-nums text-[15px] text-saffron-spark">
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <span className="font-mono-code text-[13px] font-semibold px-2 py-0.5 rounded-[6px] bg-[var(--bg-subtle)] text-[var(--brand-primary-text)]">
                           {sol.codigo}
                         </span>
-                        <span aria-hidden="true" className="text-ash-gray">·</span>
                         <EstadoLabel estado={sol.estado} />
                       </div>
-                      <p className="text-[16px] text-bone-white">
-                        {rec?.nombre ?? 'Recurso'} —{' '}
-                        <span className="text-silver-mist font-extralight">
-                          {sol.descripcion.slice(0, 95)}
+                      <p className="text-[15px] text-[var(--text-primary)] font-medium truncate">
+                        {rec?.nombre ?? 'Recurso'}{' '}
+                        <span className="text-[var(--text-secondary)] font-normal">
+                          — {sol.descripcion.slice(0, 95)}
                           {sol.descripcion.length > 95 ? '…' : ''}
                         </span>
                       </p>
                     </div>
-                    <span className="text-[13px] tabular-nums text-ash-gray whitespace-nowrap">
-                      {formatearFecha(sol.actualizadaEn)}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[12px] font-mono-code text-[var(--text-muted)] whitespace-nowrap">
+                        {formatearFecha(sol.actualizadaEn)}
+                      </span>
+                      <ChevronRight
+                        className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] group-hover:translate-x-0.5 transition-[color,transform]"
+                        aria-hidden="true"
+                      />
+                    </div>
                   </button>
                 );
               })}
-            </div>
+            </SurfaceCard>
           )}
         </section>
       )}
 
-      {/* Admin quick links to P-10, P-12, P-13, P-15 (User Flow 4.2) */}
+      {/* Admin quick links to M1, M2, M4, SU-06 + AI Toggle */}
       {isAdmin && (
-        <section aria-labelledby="admin-accesos-titulo" className="space-y-[24px]">
+        <section aria-labelledby="admin-accesos-titulo" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 id="admin-accesos-titulo" className="text-[24px] tracking-[-0.48px] text-bone-white">
+            <h2
+              id="admin-accesos-titulo"
+              className="text-[19px] sm:text-[21px] font-bold tracking-[-0.015em] text-[var(--text-primary)]"
+            >
               Administración de plataforma
             </h2>
-            <label className="flex items-center gap-[10px] text-[13px] text-ash-gray cursor-pointer">
+            <label className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-[10px] border border-[var(--ai-accent-border)] bg-[var(--ai-accent-soft)] text-[13px] font-medium text-[var(--text-primary)] cursor-pointer select-none">
+              <Sparkles className="w-4 h-4 text-[var(--ai-accent-text)] shrink-0" aria-hidden="true" />
               <input
                 type="checkbox"
                 checked={iaHabilitada}
                 onChange={(e) => setIaHabilitada(e.target.checked)}
-                className="w-4 h-4 accent-electric-iris"
+                className="w-4 h-4 accent-[var(--ai-accent)] cursor-pointer"
               />
               <span>Servicio de IA (Fase 5) habilitado</span>
             </label>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t border-b border-white/12 divide-y sm:divide-y-0 sm:divide-x divide-white/12">
-            <button
-              type="button"
-              onClick={() => navigate('/admin/empleados')}
-              className="text-left p-[24px] hover:bg-white/[0.04] transition-colors cursor-pointer space-y-[8px]"
-            >
-              <p className="nav-label text-saffron-spark">M1 · M4</p>
-              <p className="text-[24px] tracking-[-0.48px] text-bone-white">Empleados</p>
-              <p className="text-[14px] text-ash-gray">
-                Altas, edición y marca de personal técnico.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/admin/usuarios')}
-              className="text-left p-[24px] hover:bg-white/[0.04] transition-colors cursor-pointer space-y-[8px]"
-            >
-              <p className="nav-label text-saffron-spark">M1</p>
-              <p className="text-[24px] tracking-[-0.48px] text-bone-white">Usuarios</p>
-              <p className="text-[14px] text-ash-gray">
-                Perfiles, activación y restablecimiento de claves.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/admin/recursos')}
-              className="text-left p-[24px] hover:bg-white/[0.04] transition-colors cursor-pointer space-y-[8px]"
-            >
-              <p className="nav-label text-saffron-spark">M2</p>
-              <p className="text-[24px] tracking-[-0.48px] text-bone-white">Recursos</p>
-              <p className="text-[14px] text-ash-gray">
-                Equipos, instalaciones, maquinaria y herramientas.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/admin/categorias')}
-              className="text-left p-[24px] hover:bg-white/[0.04] transition-colors cursor-pointer space-y-[8px]"
-            >
-              <p className="nav-label text-saffron-spark">SU-06</p>
-              <p className="text-[24px] tracking-[-0.48px] text-bone-white">Categorías</p>
-              <p className="text-[14px] text-ash-gray">
-                Catálogo de clasificación de daños.
-              </p>
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {adminModules.map(({ code, title, desc, path, Icon, iconBg }) => (
+              <button
+                key={path}
+                type="button"
+                onClick={() => navigate(path)}
+                className="group surface-card text-left p-5 hover:border-[var(--border-strong)] hover:-translate-y-0.5 transition-[border-color,transform,box-shadow] duration-150 ease-out cursor-pointer flex flex-col justify-between gap-4 focus-visible:outline-2 focus-visible:outline-[var(--brand-primary-text)] focus-visible:outline-offset-2"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span
+                    aria-hidden="true"
+                    className={`w-10 h-10 rounded-[11px] border flex items-center justify-center shrink-0 ${iconBg}`}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </span>
+                  <span className="font-mono-code text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--text-muted)]">
+                    {code}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-display text-[18px] font-bold tracking-[-0.015em] text-[var(--text-primary)] group-hover:text-[var(--brand-primary-text)] transition-colors">
+                      {title}
+                    </p>
+                    <ChevronRight
+                      className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--brand-primary-text)] group-hover:translate-x-0.5 transition-[color,transform]"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <p className="text-[13px] leading-[1.45] text-[var(--text-secondary)]">
+                    {desc}
+                  </p>
+                </div>
+              </button>
+            ))}
           </div>
         </section>
       )}
 
-      {/* 5 most recent requests (User Flow 4.2) */}
-      <section aria-labelledby="recientes-titulo" className="space-y-[24px]">
-        <h2 id="recientes-titulo" className="text-[24px] tracking-[-0.48px] text-bone-white">
+      {/* 5 Most Recent Requests */}
+      <section aria-labelledby="recientes-titulo" className="space-y-4">
+        <h2
+          id="recientes-titulo"
+          className="text-[19px] sm:text-[21px] font-bold tracking-[-0.015em] text-[var(--text-primary)]"
+        >
           {isAdmin
             ? 'Solicitudes recientes'
             : isTecnico
@@ -279,52 +353,61 @@ export function DashboardScreen() {
             action={
               !isTecnico ? (
                 <PrimaryButton onClick={() => navigate('/solicitudes/nueva')}>
-                  Nueva solicitud
+                  <Plus className="w-4 h-4" aria-hidden="true" />
+                  <span>Nueva solicitud</span>
                 </PrimaryButton>
               ) : undefined
             }
           />
         ) : (
-          <div className="border-t border-white/12 divide-y divide-white/10">
+          <SurfaceCard padded={false} className="overflow-hidden divide-y divide-[var(--border-subtle)]">
             {recientes.map((sol) => {
               const rec = recursos.find((r) => r.id === sol.recursoId);
-              const solEmp = !isCliente ? empleados.find((e) => e.id === sol.solicitanteId) : undefined;
+              const solEmp = !isCliente
+                ? empleados.find((e) => e.id === sol.solicitanteId)
+                : undefined;
               return (
                 <button
                   key={sol.id}
                   type="button"
                   onClick={() => navigate(`/solicitudes/${sol.id}`)}
-                  className="w-full text-left py-[18px] px-[6px] hover:bg-white/[0.03] transition-colors cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-[12px]"
+                  className="group w-full text-left px-5 py-4 hover:bg-[var(--bg-subtle)]/70 transition-colors duration-150 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
-                  <div className="space-y-[6px]">
-                    <div className="flex flex-wrap items-center gap-[10px] text-[14px]">
-                      <span className="tabular-nums text-bone-white">{sol.codigo}</span>
-                      <span aria-hidden="true" className="text-ash-gray">·</span>
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2.5 text-[13px]">
+                      <span className="font-mono-code font-semibold px-2 py-0.5 rounded-[6px] bg-[var(--bg-subtle)] text-[var(--text-primary)] group-hover:text-[var(--brand-primary-text)] transition-colors">
+                        {sol.codigo}
+                      </span>
                       <EstadoLabel estado={sol.estado} />
                       {isAdmin && solEmp && (
-                        <>
-                          <span aria-hidden="true" className="text-ash-gray">·</span>
-                          <span className="text-ash-gray">
-                            {solEmp.nombres} {solEmp.apellidos}
-                            {!solEmp.activo ? ' (inactivo)' : ''}
-                          </span>
-                        </>
+                        <span className="text-[var(--text-muted)] text-[13px]">
+                          {solEmp.nombres} {solEmp.apellidos}
+                          {!solEmp.activo ? ' (inactivo)' : ''}
+                        </span>
                       )}
                     </div>
-                    <p className="text-[16px] text-silver-mist font-extralight">
-                      <span className="text-bone-white font-normal">{rec?.nombre ?? 'Recurso'}</span>
+                    <p className="text-[15px] text-[var(--text-secondary)] leading-[1.45] line-clamp-2 sm:line-clamp-1">
+                      <span className="text-[var(--text-primary)] font-semibold">
+                        {rec?.nombre ?? 'Recurso'}
+                      </span>
                       {' — '}
                       {sol.descripcion.slice(0, 100)}
                       {sol.descripcion.length > 100 ? '…' : ''}
                     </p>
                   </div>
-                  <span className="text-[13px] tabular-nums text-ash-gray whitespace-nowrap">
-                    {formatearFecha(sol.creadaEn)}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[12px] font-mono-code text-[var(--text-muted)] whitespace-nowrap">
+                      {formatearFecha(sol.creadaEn)}
+                    </span>
+                    <ChevronRight
+                      className="w-4 h-4 text-[var(--text-muted)] group-hover:text-[var(--text-primary)] group-hover:translate-x-0.5 transition-[color,transform]"
+                      aria-hidden="true"
+                    />
+                  </div>
                 </button>
               );
             })}
-          </div>
+          </SurfaceCard>
         )}
       </section>
     </div>

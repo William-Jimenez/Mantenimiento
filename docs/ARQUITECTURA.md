@@ -40,6 +40,11 @@ Este documento describe únicamente los módulos críticos, complejos o con deci
 ### 1.4 Internacionalización (`src/i18n/translations.ts`)
 * Exporta `translateText(text, language)` y persiste la preferencia en `localStorage` (`LANG_STORAGE_KEY`, `THEME_STORAGE_KEY`). Es un diccionario bidireccional ES/EN usado por pantallas y componentes.
 
+### 1.5 Sistema de Diseño y Arquitectura Visual (`src/index.css`, `src/components/CommonUI.tsx`)
+* **Sistema de Tokens Semánticos (`src/index.css`):** Centraliza en variables CSS la arquitectura visual *Precision Industrial Control* bajo armonía complementaria dividida (Cobalt Precision `#2563EB`, Industrial Amber `#F59E0B`, Verdant Teal `#0F766E` / `#10B981`, Signal Crimson `#DC2626` e Indigo IA `#6366F1`), con elevación de superficies en 4 niveles (`--bg-canvas`, `--bg-surface`, `--bg-elevated`, `--bg-subtle`) y soporte nativo para Modo Oscuro (`[data-theme="dark"]`) y Modo Claro (`[data-theme="light"]`) con ratios verificados WCAG 2.2 AA (≥ 4.5:1).
+* **Tipografía y Microinteracciones:** Jerarquía con `Plus Jakarta Sans` (títulos), `Inter` (UI y lectura) y `JetBrains Mono` (`tabular-nums` para códigos de solicitud, activos, fechas y OTP), respetando `prefers-reduced-motion` y transiciones explícitas sin `transition: all`.
+* **Biblioteca Reutilizable (`src/components/CommonUI.tsx`):** Primitivas consistentes (`PrimaryButton`, `OutlineButton`, `DangerButton`, `GhostButton`, `PageHeader`, `SurfaceCard`, `AlertBanner`, `FilterChip`, `EstadoLabel`, `PrioridadLabel`, `ModalDialog` con restauración de foco, `EmptyState`, `SkeletonRows`), acompañadas por `HeroModel3D` y `ServiceScene3D` sincronizados dinámicamente con los tokens de tema.
+
 ---
 
 ## 2. Servidor Node.js / Express (`src/server/`)

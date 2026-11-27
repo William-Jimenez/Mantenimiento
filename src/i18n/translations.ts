@@ -28,6 +28,7 @@ export const UI_DICTIONARY_ES_TO_EN: Record<string, string> = {
   'Cerrar notificación': 'Close notification',
   'Cerrar diálogo': 'Close dialog',
   'Cargando contenido': 'Loading content',
+  'Saltar al contenido principal': 'Skip to main content',
 
   // Controles de tema e idioma
   'Oscuro': 'Dark',

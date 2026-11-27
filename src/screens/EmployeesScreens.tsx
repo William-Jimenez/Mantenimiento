@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
+import { Plus, Search, Wrench } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
+  AlertBanner,
   EmptyState,
   FieldError,
   FieldLabel,
+  FilterChip,
   GhostButton,
   inputBaseClass,
   ModalDialog,
   OutlineButton,
+  PageHeader,
   PrimaryButton,
+  SurfaceCard,
 } from '../components/CommonUI';
 import { ErrorScreen } from './ErrorScreen';
 import { Solicitud } from '../types/domain';
@@ -58,58 +63,51 @@ export function EmployeesListScreen() {
   };
 
   return (
-    <section className="space-y-[36px]">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-[24px]">
-        <div className="space-y-[12px]">
-          <p className="nav-label text-saffron-spark">Administración · M1 y M4</p>
-          <h1 className="text-[42px] sm:text-[56px] leading-[1.08] tracking-[-1.68px] text-bone-white">
-            Empleados
-          </h1>
-          <p className="body-ultralight text-silver-mist max-w-[580px]">
-            Gestione los trabajadores de la empresa e identifique quiénes desempeñan funciones técnicas.
-          </p>
-        </div>
-        <PrimaryButton onClick={() => navigate('/admin/empleados/nuevo')}>
-          Nuevo empleado
-        </PrimaryButton>
-      </div>
+    <section className="space-y-6">
+      <PageHeader
+        eyebrow="Administración · M1 y M4"
+        title="Empleados"
+        description="Gestione los trabajadores de la empresa e identifique quiénes desempeñan funciones técnicas."
+        actions={
+          <PrimaryButton onClick={() => navigate('/admin/empleados/nuevo')}>
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            <span>Nuevo empleado</span>
+          </PrimaryButton>
+        }
+      />
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-[18px] pb-[18px] border-b border-white/12">
-        <div className="flex items-center gap-[12px]">
-          <button
-            type="button"
+      {/* Filter Bar */}
+      <SurfaceCard className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <FilterChip
+            active={!filtroSoloTecnicos}
             onClick={() => setFiltroSoloTecnicos(false)}
-            className={`px-[14px] py-[8px] rounded-[24px] text-[14px] cursor-pointer transition-colors ${
-              !filtroSoloTecnicos
-                ? 'bg-electric-iris text-bone-white'
-                : 'text-ash-gray hover:text-bone-white border border-white/15'
-            }`}
           >
             Todos ({empleados.length})
-          </button>
-          <button
-            type="button"
+          </FilterChip>
+          <FilterChip
+            active={filtroSoloTecnicos}
             onClick={() => setFiltroSoloTecnicos(true)}
-            className={`px-[14px] py-[8px] rounded-[24px] text-[14px] cursor-pointer transition-colors ${
-              filtroSoloTecnicos
-                ? 'bg-electric-iris text-bone-white'
-                : 'text-ash-gray hover:text-bone-white border border-white/15'
-            }`}
           >
             Solo técnicos ({empleados.filter((e) => e.esTecnico && e.activo).length})
-          </button>
+          </FilterChip>
         </div>
 
-        <input
-          type="search"
-          aria-label="Buscar empleado"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por nombre, documento o correo…"
-          className={`${inputBaseClass} sm:max-w-[320px]`}
-        />
-      </div>
+        <div className="relative sm:max-w-[320px] w-full">
+          <Search
+            className="w-4 h-4 text-[var(--text-muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            aria-label="Buscar empleado"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre, documento o correo…"
+            className={`${inputBaseClass} !min-h-[40px] !py-2 pl-10 text-[14px]`}
+          />
+        </div>
+      </SurfaceCard>
 
       {filtrados.length === 0 ? (
         <EmptyState
@@ -122,85 +120,193 @@ export function EmployeesListScreen() {
           }
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-white/15 text-[12px] uppercase tracking-[0.35px] text-ash-gray">
-                <th className="py-[12px] pr-[18px] font-semibold">Nombre</th>
-                <th className="py-[12px] pr-[18px] font-semibold">Documento</th>
-                <th className="py-[12px] pr-[18px] font-semibold">Cargo</th>
-                <th className="py-[12px] pr-[18px] font-semibold">Función técnica</th>
-                <th className="py-[12px] pr-[18px] font-semibold">Usuario</th>
-                <th className="py-[12px] pr-[18px] font-semibold">Estado</th>
-                <th className="py-[12px] text-right font-semibold">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10 text-[15px]">
-              {filtrados.map((emp) => {
-                const usr = usuarios.find((u) => u.empleadoId === emp.id);
-                const activasCount = asignaciones.filter(
-                  (a) => a.vigente && a.tecnicoId === emp.id
-                ).length;
+        <>
+          {/* Desktop Table */}
+          <SurfaceCard padded={false} className="hidden lg:block overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[var(--bg-subtle)]/70 border-b border-[var(--border-subtle)] text-[12px] uppercase tracking-[0.05em] text-[var(--text-muted)]">
+                    <th className="py-3.5 pl-5 pr-4 font-semibold">Nombre</th>
+                    <th className="py-3.5 px-4 font-semibold">Documento</th>
+                    <th className="py-3.5 px-4 font-semibold">Cargo</th>
+                    <th className="py-3.5 px-4 font-semibold">Función técnica</th>
+                    <th className="py-3.5 px-4 font-semibold">Usuario</th>
+                    <th className="py-3.5 px-4 font-semibold">Estado</th>
+                    <th className="py-3.5 pl-4 pr-5 text-right font-semibold">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)] text-[14px]">
+                  {filtrados.map((emp) => {
+                    const usr = usuarios.find((u) => u.empleadoId === emp.id);
+                    const activasCount = asignaciones.filter(
+                      (a) => a.vigente && a.tecnicoId === emp.id
+                    ).length;
 
-                return (
-                  <tr key={emp.id} className="hover:bg-white/[0.03] transition-colors">
-                    <td className="py-[16px] pr-[18px]">
-                      <div className="text-bone-white">
+                    return (
+                      <tr
+                        key={emp.id}
+                        className="hover:bg-[var(--bg-subtle)]/50 transition-colors"
+                      >
+                        <td className="py-4 pl-5 pr-4">
+                          <div className="font-semibold text-[var(--text-primary)]">
+                            {emp.nombres} {emp.apellidos}
+                          </div>
+                          <div className="text-[12px] font-mono-code text-[var(--text-muted)] mt-0.5">
+                            {emp.correo}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 font-mono-code text-[13px] text-[var(--text-secondary)]">
+                          {emp.documento}
+                        </td>
+                        <td className="py-4 px-4 text-[var(--text-secondary)]">{emp.cargo}</td>
+                        <td className="py-4 px-4">
+                          {emp.esTecnico ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[7px] bg-[var(--brand-primary-soft)] border border-[var(--brand-primary-border)] text-[var(--brand-primary-text)] text-[12px] font-semibold whitespace-nowrap">
+                              <Wrench className="w-3 h-3" aria-hidden="true" />
+                              <span>
+                                Técnico activo
+                                {activasCount > 0 ? ` · ${activasCount} asignada(s)` : ''}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-[var(--text-muted)] text-[13px]">No</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-[13px]">
+                          {usr ? (
+                            <span className="px-2 py-0.5 rounded-[6px] bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)] font-medium">
+                              {usr.perfil}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/admin/usuarios?empleadoId=${emp.id}`)}
+                              className="text-[var(--brand-primary-text)] font-semibold hover:underline cursor-pointer"
+                            >
+                              Crear usuario
+                            </button>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-[13px]">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[6px] border text-[12px] font-semibold ${
+                              emp.activo
+                                ? 'bg-[var(--status-success-soft)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
+                                : 'bg-[var(--bg-subtle)] border-[var(--border-default)] text-[var(--text-muted)]'
+                            }`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                emp.activo
+                                  ? 'bg-[var(--status-success-text)]'
+                                  : 'bg-[var(--text-muted)]'
+                              }`}
+                            />
+                            {emp.activo ? 'Activo' : 'Inactivo'}
+                          </span>
+                        </td>
+                        <td className="py-4 pl-4 pr-5 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1">
+                            <GhostButton
+                              onClick={() =>
+                                handleToggleTecnico(emp.id, `${emp.nombres} ${emp.apellidos}`)
+                              }
+                            >
+                              {emp.esTecnico ? 'Quitar técnico' : 'Marcar técnico'}
+                            </GhostButton>
+                            <GhostButton onClick={() => navigate(`/admin/empleados/${emp.id}`)}>
+                              Editar
+                            </GhostButton>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </SurfaceCard>
+
+          {/* Mobile / Tablet Cards */}
+          <div className="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {filtrados.map((emp) => {
+              const usr = usuarios.find((u) => u.empleadoId === emp.id);
+              const activasCount = asignaciones.filter(
+                (a) => a.vigente && a.tecnicoId === emp.id
+              ).length;
+
+              return (
+                <SurfaceCard key={emp.id} className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[16px] font-bold text-[var(--text-primary)] truncate">
                         {emp.nombres} {emp.apellidos}
-                      </div>
-                      <div className="text-[13px] text-ash-gray">{emp.correo}</div>
-                    </td>
-                    <td className="py-[16px] pr-[18px] tabular-nums text-silver-mist">
-                      {emp.documento}
-                    </td>
-                    <td className="py-[16px] pr-[18px] text-silver-mist">{emp.cargo}</td>
-                    <td className="py-[16px] pr-[18px]">
-                      {emp.esTecnico ? (
-                        <span className="text-electric-iris text-[14px]">
+                      </p>
+                      <p className="text-[12px] font-mono-code text-[var(--text-muted)] truncate">
+                        {emp.correo}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-[6px] border text-[11px] font-semibold shrink-0 ${
+                        emp.activo
+                          ? 'bg-[var(--status-success-soft)] border-[var(--status-success-border)] text-[var(--status-success-text)]'
+                          : 'bg-[var(--bg-subtle)] border-[var(--border-default)] text-[var(--text-muted)]'
+                      }`}
+                    >
+                      {emp.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+
+                  <div className="text-[13px] space-y-1.5 text-[var(--text-secondary)]">
+                    <p>
+                      <span className="text-[var(--text-muted)]">Documento:</span>{' '}
+                      <span className="font-mono-code">{emp.documento}</span>
+                    </p>
+                    <p>
+                      <span className="text-[var(--text-muted)]">Cargo:</span> {emp.cargo}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {emp.esTecnico && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[6px] bg-[var(--brand-primary-soft)] border border-[var(--brand-primary-border)] text-[var(--brand-primary-text)] text-[12px] font-semibold">
                           Técnico activo{activasCount > 0 ? ` · ${activasCount} asignada(s)` : ''}
                         </span>
-                      ) : (
-                        <span className="text-ash-gray text-[14px]">No</span>
                       )}
-                    </td>
-                    <td className="py-[16px] pr-[18px] text-[14px]">
                       {usr ? (
-                        <span className="text-silver-mist">{usr.perfil}</span>
+                        <span className="px-2 py-0.5 rounded-[6px] bg-[var(--bg-subtle)] border border-[var(--border-subtle)] text-[12px]">
+                          {usr.perfil}
+                        </span>
                       ) : (
                         <button
                           type="button"
                           onClick={() => navigate(`/admin/usuarios?empleadoId=${emp.id}`)}
-                          className="text-saffron-spark hover:underline cursor-pointer"
+                          className="text-[var(--brand-primary-text)] text-[12px] font-semibold hover:underline cursor-pointer"
                         >
                           Crear usuario
                         </button>
                       )}
-                    </td>
-                    <td className="py-[16px] pr-[18px] text-[14px]">
-                      <span className={emp.activo ? 'text-deep-verdant' : 'text-ash-gray'}>
-                        {emp.activo ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td className="py-[16px] text-right whitespace-nowrap">
-                      <div className="inline-flex items-center gap-[12px]">
-                        <GhostButton
-                          onClick={() =>
-                            handleToggleTecnico(emp.id, `${emp.nombres} ${emp.apellidos}`)
-                          }
-                        >
-                          {emp.esTecnico ? 'Quitar técnico' : 'Marcar técnico'}
-                        </GhostButton>
-                        <GhostButton onClick={() => navigate(`/admin/empleados/${emp.id}`)}>
-                          Editar
-                        </GhostButton>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-wrap items-center gap-2">
+                    <OutlineButton
+                      onClick={() =>
+                        handleToggleTecnico(emp.id, `${emp.nombres} ${emp.apellidos}`)
+                      }
+                      className="!min-h-[38px] !py-1.5 !px-3 !text-[13px]"
+                    >
+                      {emp.esTecnico ? 'Quitar técnico' : 'Marcar técnico'}
+                    </OutlineButton>
+                    <GhostButton onClick={() => navigate(`/admin/empleados/${emp.id}`)}>
+                      Editar
+                    </GhostButton>
+                  </div>
+                </SurfaceCard>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {/* RS-01 Guard modal when technician still has active requests */}
@@ -210,15 +316,15 @@ export function EmployeesListScreen() {
         onClose={() => setAlertaTecnico(null)}
       >
         {alertaTecnico && (
-          <div className="space-y-[18px]">
-            <p className="body-ultralight text-silver-mist">{alertaTecnico.mensaje}</p>
-            <ul className="divide-y divide-white/10 border-t border-b border-white/10">
+          <div className="space-y-4">
+            <AlertBanner variant="warning">{alertaTecnico.mensaje}</AlertBanner>
+            <ul className="divide-y divide-[var(--border-subtle)] border border-[var(--border-default)] rounded-[12px] overflow-hidden list-none p-0">
               {alertaTecnico.solicitudes.map((s) => (
                 <li
                   key={s.id}
-                  className="py-[12px] flex items-center justify-between gap-4 text-[14px]"
+                  className="px-4 py-3 flex items-center justify-between gap-4 text-[14px] bg-[var(--bg-canvas)]/50"
                 >
-                  <span className="tabular-nums text-bone-white">
+                  <span className="font-mono-code font-medium text-[var(--text-primary)]">
                     {s.codigo} · {s.estado}
                   </span>
                   <button
@@ -227,14 +333,14 @@ export function EmployeesListScreen() {
                       setAlertaTecnico(null);
                       navigate(`/solicitudes/${s.id}`);
                     }}
-                    className="text-saffron-spark hover:underline cursor-pointer"
+                    className="text-[var(--brand-primary-text)] font-semibold hover:underline cursor-pointer"
                   >
                     Abrir solicitud
                   </button>
                 </li>
               ))}
             </ul>
-            <div className="pt-[6px]">
+            <div className="pt-2">
               <OutlineButton onClick={() => setAlertaTecnico(null)}>Entendido</OutlineButton>
             </div>
           </div>
@@ -286,130 +392,133 @@ export function EmployeeFormScreen({ empleadoId }: { empleadoId?: number }) {
   };
 
   return (
-    <section className="max-w-[680px] space-y-[36px]">
-      <div className="space-y-[12px]">
-        <GhostButton onClick={() => navigate('/admin/empleados')}>
-          ← Volver a empleados
-        </GhostButton>
-        <h1 className="text-[42px] leading-[1.1] tracking-[-1.68px] text-bone-white">
-          {existing ? 'Editar empleado' : 'Nuevo empleado'}
-        </h1>
-      </div>
+    <section className="max-w-[720px] space-y-6">
+      <PageHeader
+        backAction={
+          <GhostButton onClick={() => navigate('/admin/empleados')} className="-ml-2.5">
+            ← Volver a empleados
+          </GhostButton>
+        }
+        eyebrow="Administración · M1 y M4"
+        title={existing ? 'Editar empleado' : 'Nuevo empleado'}
+      />
 
       {errorInfo && !errorInfo.campo && (
-        <div role="alert" className="border border-saffron-spark/60 rounded-[12px] px-[16px] py-[12px] text-[14px] text-saffron-spark">
-          {errorInfo.mensaje}
-        </div>
+        <AlertBanner variant="error">{errorInfo.mensaje}</AlertBanner>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-[24px]" noValidate>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
-          <div>
-            <FieldLabel htmlFor="emp-doc" required>
-              Documento de identidad
-            </FieldLabel>
-            <input
-              id="emp-doc"
-              type="text"
-              value={documento}
-              onChange={(e) => setDocumento(e.target.value)}
-              className={inputBaseClass}
-            />
-            <FieldError message={errorInfo?.campo === 'documento' ? errorInfo.mensaje : null} />
+      <SurfaceCard>
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FieldLabel htmlFor="emp-doc" required>
+                Documento de identidad
+              </FieldLabel>
+              <input
+                id="emp-doc"
+                type="text"
+                value={documento}
+                onChange={(e) => setDocumento(e.target.value)}
+                className={inputBaseClass}
+              />
+              <FieldError message={errorInfo?.campo === 'documento' ? errorInfo.mensaje : null} />
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="emp-cargo" required>
+                Cargo
+              </FieldLabel>
+              <input
+                id="emp-cargo"
+                type="text"
+                value={cargo}
+                onChange={(e) => setCargo(e.target.value)}
+                className={inputBaseClass}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FieldLabel htmlFor="emp-nombres" required>
+                Nombres
+              </FieldLabel>
+              <input
+                id="emp-nombres"
+                type="text"
+                value={nombres}
+                onChange={(e) => setNombres(e.target.value)}
+                className={inputBaseClass}
+              />
+            </div>
+
+            <div>
+              <FieldLabel htmlFor="emp-apellidos" required>
+                Apellidos
+              </FieldLabel>
+              <input
+                id="emp-apellidos"
+                type="text"
+                value={apellidos}
+                onChange={(e) => setApellidos(e.target.value)}
+                className={inputBaseClass}
+              />
+            </div>
           </div>
 
           <div>
-            <FieldLabel htmlFor="emp-cargo" required>
-              Cargo
+            <FieldLabel htmlFor="emp-correo" required>
+              Correo corporativo
             </FieldLabel>
             <input
-              id="emp-cargo"
-              type="text"
-              value={cargo}
-              onChange={(e) => setCargo(e.target.value)}
+              id="emp-correo"
+              type="email"
+              value={correo}
+              onChange={(e) => setCorreo(e.target.value)}
               className={inputBaseClass}
             />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
-          <div>
-            <FieldLabel htmlFor="emp-nombres" required>
-              Nombres
-            </FieldLabel>
-            <input
-              id="emp-nombres"
-              type="text"
-              value={nombres}
-              onChange={(e) => setNombres(e.target.value)}
-              className={inputBaseClass}
-            />
+            <FieldError message={errorInfo?.campo === 'correo' ? errorInfo.mensaje : null} />
           </div>
 
-          <div>
-            <FieldLabel htmlFor="emp-apellidos" required>
-              Apellidos
-            </FieldLabel>
-            <input
-              id="emp-apellidos"
-              type="text"
-              value={apellidos}
-              onChange={(e) => setApellidos(e.target.value)}
-              className={inputBaseClass}
-            />
-          </div>
-        </div>
-
-        <div>
-          <FieldLabel htmlFor="emp-correo" required>
-            Correo corporativo
-          </FieldLabel>
-          <input
-            id="emp-correo"
-            type="email"
-            value={correo}
-            onChange={(e) => setCorreo(e.target.value)}
-            className={inputBaseClass}
-          />
-          <FieldError message={errorInfo?.campo === 'correo' ? errorInfo.mensaje : null} />
-        </div>
-
-        <div className="space-y-[12px] pt-[6px]">
-          <label className="flex items-center gap-[12px] cursor-pointer min-h-[44px]">
-            <input
-              type="checkbox"
-              checked={esTecnico}
-              onChange={(e) => setEsTecnico(e.target.checked)}
-              className="w-5 h-5 accent-electric-iris"
-            />
-            <span className="text-[16px] text-bone-white">
-              Es técnico (habilitado para recibir asignaciones de mantenimiento)
-            </span>
-          </label>
-
-          {existing && (
-            <label className="flex items-center gap-[12px] cursor-pointer min-h-[44px]">
+          <div className="space-y-2.5 pt-2">
+            <label className="flex items-center gap-3 p-3.5 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 cursor-pointer hover:border-[var(--border-default)] transition-colors">
               <input
                 type="checkbox"
-                checked={activo}
-                onChange={(e) => setActivo(e.target.checked)}
-                className="w-5 h-5 accent-electric-iris"
+                checked={esTecnico}
+                onChange={(e) => setEsTecnico(e.target.checked)}
+                className="w-4 h-4 accent-[var(--brand-primary)]"
               />
-              <span className="text-[16px] text-bone-white">Empleado activo</span>
+              <span className="text-[14px] font-medium text-[var(--text-primary)]">
+                Es técnico (habilitado para recibir asignaciones de mantenimiento)
+              </span>
             </label>
-          )}
-        </div>
 
-        <div className="flex flex-wrap items-center gap-[18px] pt-[12px]">
-          <PrimaryButton type="submit">Guardar empleado</PrimaryButton>
-          <OutlineButton onClick={() => navigate('/admin/empleados')}>Cancelar</OutlineButton>
-          {existing && !usuarioAsociado && (
-            <GhostButton onClick={() => navigate(`/admin/usuarios?empleadoId=${existing.id}`)}>
-              Crear usuario para este empleado →
-            </GhostButton>
-          )}
-        </div>
-      </form>
+            {existing && (
+              <label className="flex items-center gap-3 p-3.5 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-canvas)]/50 cursor-pointer hover:border-[var(--border-default)] transition-colors">
+                <input
+                  type="checkbox"
+                  checked={activo}
+                  onChange={(e) => setActivo(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--brand-primary)]"
+                />
+                <span className="text-[14px] font-medium text-[var(--text-primary)]">
+                  Empleado activo
+                </span>
+              </label>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-[var(--border-subtle)]">
+            <PrimaryButton type="submit">Guardar empleado</PrimaryButton>
+            <OutlineButton onClick={() => navigate('/admin/empleados')}>Cancelar</OutlineButton>
+            {existing && !usuarioAsociado && (
+              <GhostButton onClick={() => navigate(`/admin/usuarios?empleadoId=${existing.id}`)}>
+                Crear usuario para este empleado →
+              </GhostButton>
+            )}
+          </div>
+        </form>
+      </SurfaceCard>
     </section>
   );
 }
