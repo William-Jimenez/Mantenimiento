@@ -724,7 +724,7 @@ export function LoginScreen() {
                 </summary>
                 <div className="mt-3 space-y-2 border-t border-[var(--border-subtle)] pt-3">
                   {[
-                    { label: 'Administrador', email: 'admin@empresa.com', pass: '' },
+                    { label: 'Administrador', email: 'admin@empresa.com', pass: 'admin12345' },
                     { label: 'Empleado Técnico', email: 'tecnico@empresa.com', pass: 'Tecnico2026' },
                     { label: 'Cliente', email: 'cliente@empresa.com', pass: 'Cliente2026' },
                     { label: 'Cliente · Clave temporal P-02', email: 'mateo.rojas@empresa.com', pass: 'Temporal2026' },
